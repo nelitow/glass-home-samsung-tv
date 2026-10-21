@@ -74,15 +74,21 @@
     // load, Samsung TV Plus is a system app), so those default to name tiles.
     apps: [
       { key: 'youtube', label: 'YouTube', ids: ['9Ur5IzDKqV.TizenYouTube', 'com.samsung.tv.cobalt-yt'],
-        names: ['^youtube$'], icon: false },
+        names: ['^youtube$'], icon: 'img/apps/youtube.svg' },
       { key: 'netflix', label: 'Netflix', ids: ['org.tizen.netflix-app'],
         names: ['^netflix$', '\\bnetflix\\b'] },
       { key: 'prime', label: 'Prime Video', ids: ['org.tizen.primevideo', 'org.tizen.ignition'],
-        names: ['^prime video$', '^amazon prime video$', '\\bprime video\\b'], icon: false },
-      { key: 'tvplus', label: 'Samsung TV Plus', ids: ['com.samsung.tv.tvPlusDeeplinker', 'com.samsung.tv.tvplus'],
-        names: ['^samsung tv plus$', '^tv plus$', 'samsung tv plus'], icon: false },
+        names: ['^prime video$', '^amazon prime video$', '\\bprime video\\b'], icon: 'img/apps/primevideo.svg' },
       { key: 'disney', label: 'Disney+', ids: ['MCmYXNxgcu.DisneyPlus'],
         names: ['^disney plus$', '\\bdisney plus\\b', '^disney$'] },
+      { key: 'hbomax', label: 'HBO Max', ids: ['cj37Ni3qXM.HBONow'],
+        names: ['^hbo max$', '^max$'] },
+      { key: 'appletv', label: 'Apple TV', ids: ['com.samsung.tv.aria-video'],
+        names: ['^apple tv$'] },
+      { key: 'paramount', label: 'Paramount+', ids: ['rJyOSqC6Up.PPlusIntl'],
+        names: ['^paramount plus$'] },
+      { key: 'spotify', label: 'Spotify', ids: ['rJeHak5zRg.Spotify'],
+        names: ['^spotify\\b'] },
       { key: 'browser', label: 'Internet', ids: ['org.tizen.browser'],
         names: ['^internet$', '^browser$'] }
     ]
