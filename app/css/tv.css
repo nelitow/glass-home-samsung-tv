@@ -348,9 +348,12 @@ html.lite #wx-week {
   padding: 0 calc(var(--dock-pad-x) - 16px);
   height: calc(var(--tile) + 2 * var(--dock-pad-y));
 }
+/* Taller than the dock, so the lifted, enlarged focused tile isn't clipped
+   when the row scrolls (overflow and the edge fades cut at this box). */
 #dock-viewport {
   position: relative;
-  height: 100%;
+  top: -50px;
+  height: calc(100% + 100px);
   z-index: 1;
 }
 #dock.scrolling #dock-viewport { overflow: hidden; }
@@ -369,7 +372,7 @@ html.lite #wx-week {
 #dock-row {
   position: absolute;
   left: 16px;
-  top: var(--dock-pad-y);
+  top: calc(var(--dock-pad-y) + 50px);
   display: flex;
   gap: var(--gap);
   transition: transform 0.38s var(--ease), opacity 0.25s ease;
