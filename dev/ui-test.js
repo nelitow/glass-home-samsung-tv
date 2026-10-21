@@ -61,10 +61,10 @@ async function tvState(p) {
     const base = 'http://127.0.0.1:' + UI + '/index.html?preview=1&api=' + encodeURIComponent('http://127.0.0.1:' + PORT);
     await tv.goto(base + '&bg=nature-06.jpg', 4500);
     let s = await tvState(tv);
-    check('dock has 6 apps + 3 shortcuts + "+"', s.count === 10, s.count);
+    check('dock has 6 apps + 3 shortcuts + Vibe + "+"', s.count === 11, s.count);
     check('first tile (YouTube) focused at start', s.focus === 0 && s.label === 'YouTube', s);
     const order = await tv.eval(`[...document.querySelectorAll('#dock-row .tile')].map((t, i) => t.className.replace('tile tile-', '').split(' ')[0])`);
-    check('apps first, then shortcuts, then +', JSON.stringify(order) === JSON.stringify(['app', 'app', 'app', 'app', 'app', 'app', 'web', 'web', 'youtube', 'add']), order);
+    check('apps first, then shortcuts, then Vibe and +', JSON.stringify(order) === JSON.stringify(['app', 'app', 'app', 'app', 'app', 'app', 'web', 'web', 'youtube', 'vibe', 'add']), order);
     await tv.shot(path.join(OUT, 'tv-home.png'));
 
     await tv.key(K.LEFT);
@@ -116,7 +116,7 @@ async function tvState(p) {
     await tv.key(K.ENTER);
     await sleep(400);
     s = await tvState(tv);
-    check('Hide removes the app from the dock', s.count === 9, { count: s.count, before: beforeHide.menuItems, open: beforeHide.menuOpen, label: beforeHide.label });
+    check('Hide removes the app from the dock', s.count === 10, { count: s.count, before: beforeHide.menuItems, open: beforeHide.menuOpen, label: beforeHide.label });
 
     // Go to the + tile (last) and open the panel.
     for (let i = 0; i < 10; i++) await tv.key(K.RIGHT);
@@ -134,7 +134,7 @@ async function tvState(p) {
     await tv.key(K.ENTER);                 // Show hidden apps
     await sleep(400);
     s = await tvState(tv);
-    check('hidden app restored', s.count === 10, s.count);
+    check('hidden app restored', s.count === 11, s.count);
     await tv.key(K.LEFT);
     await sleep(300);
     await tv.shot(path.join(OUT, 'tv-panel.png'));
@@ -163,7 +163,7 @@ async function tvState(p) {
     check('Back closes the panel', !s.panelOpen, s);
     await tv.key(K.BACK);
     s = await tvState(tv);
-    check('Back at the top level does nothing', !s.panelOpen && !s.menuOpen && s.count === 10, s);
+    check('Back at the top level does nothing', !s.panelOpen && !s.menuOpen && s.count === 11, s);
 
     // Visibility: hidden pauses the clock timer and photo rotation.
     const vis = await tv.eval(`(() => {
@@ -276,7 +276,7 @@ async function tvState(p) {
     const tv3 = await browser.newPage({ width: 1920, height: 1080 });
     await tv3.goto(base + '&bg=nature-04.jpg&focus=0', 4500);
     const n3 = await tv3.eval(`document.querySelectorAll('#dock-row .tile').length`);
-    check('first run: six apps and +', n3 === 7, n3);
+    check('first run: six apps, Vibe and +', n3 === 8, n3);
     await tv3.shot(path.join(OUT, 'tv-first-run.png'));
     await tv3.close();
   } finally {
