@@ -136,6 +136,8 @@
     t.textContent = main.trim();
     if (period) { var s = document.createElement('span'); s.className = 'ampm'; s.textContent = period; t.appendChild(s); }
     $('date').textContent = dateText;
+    var h = now.getHours();
+    $('greeting').textContent = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   }
 
   // ---------- dock model ----------
@@ -151,14 +153,15 @@
     orderedAppKeys().forEach(function (k) {
       var a = apps[k];
       if (!a || hidden.indexOf(k) >= 0) return;
-      list.push({ kind: 'app', key: 'app:' + k, appKey: k, label: defByKey[k].label, id: a.id,
+      list.push({ kind: 'app', key: 'app:' + k, appKey: k, label: defByKey[k].label, id: a.id, tint: defByKey[k].tint,
         icon: defByKey[k].icon === false ? null : (defByKey[k].icon || P.iconUrl(a.iconPath)) });
     });
     shortcuts.forEach(function (s) {
       list.push({
         kind: s.type === 'youtube' ? 'youtube' : 'web', key: 'sc:' + s.id, scId: s.id, label: s.name, url: s.url,
         videoId: s.videoId, playlistId: s.playlistId, start: s.start,
-        icon: s.icon ? D.media(s.icon) : null, iconW: s.iconW || 0
+        icon: s.icon ? D.media(s.icon) : null, iconW: s.iconW || 0,
+        tint: s.type === 'youtube' ? '#ff0033' : 'hsl(' + hueFor(hostOf(s.url) || s.name || '') + ', 70%, 50%)'
       });
     });
     list.push({ kind: 'add', key: 'add', label: 'Add photos and shortcuts' });
@@ -287,6 +290,7 @@
     } else {
       face.appendChild(plusGlyph());
     }
+    face.appendChild(div('spec'));
     face.appendChild(div('sheen'));
     return el;
   }
@@ -334,7 +338,7 @@
     GAP = sz.gap;
     dock.style.setProperty('--tile', TILE + 'px');
     dock.style.setProperty('--gap', GAP + 'px');
-    dock.style.setProperty('--tile-radius', Math.round(TILE * 0.192) + 'px');
+    dock.style.setProperty('--tile-radius', Math.round(TILE * 0.225) + 'px');
   }
 
   function dockHeight() { return TILE + 2 * PADY; }
@@ -367,6 +371,38 @@
     return cx;
   }
 
+  // ---------- top shelf: the focused tile's name, over a wash of its colour ----------
+  var washA = $('wash-a');
+  var washB = $('wash-b');
+  var shelfTitle = $('shelf-title');
+  var shelfSub = $('shelf-sub');
+  var shelfKey = null;
+  var shelfTimer = null;
+
+  function shelfSubFor(it) {
+    if (it.kind === 'app') return 'Press OK to open';
+    if (it.kind === 'youtube') return 'YouTube';
+    if (it.kind === 'web') return hostOf(it.url);
+    return 'From your phone, on the home Wi-Fi';
+  }
+
+  function renderShelf(it) {
+    if (it.key === shelfKey) return;
+    shelfKey = it.key;
+    var next = washA.classList.contains('show') ? washB : washA;
+    var prev = next === washA ? washB : washA;
+    if (it.tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + it.tint + ' 0%, transparent 70%)';
+    next.classList.toggle('show', !!it.tint);
+    prev.classList.remove('show');
+    $('shelf').classList.remove('on');
+    clearTimeout(shelfTimer);
+    shelfTimer = setTimeout(function () {
+      shelfTitle.textContent = it.label;
+      shelfSub.textContent = shelfSubFor(it);
+      $('shelf').classList.add('on');
+    }, 140);
+  }
+
   function setFocus(i, quiet) {
     if (!items.length) return;
     i = clamp(i, 0, items.length - 1);
@@ -378,6 +414,7 @@
     var text = items[focus].label;
     if (label.textContent !== text) label.textContent = text;
     if (mode === 'dock') label.classList.add('on');
+    renderShelf(items[focus]);
     layoutDock();
     if (!quiet) {
       focusKey = items[focus].key;

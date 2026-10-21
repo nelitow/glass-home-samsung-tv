@@ -68,28 +68,29 @@
     // The dock's apps, in order. Each is found at start-up by the Tizen app IDs
     // listed (list yours with `sdb shell 0 vd_applist` in Developer Mode), then
     // by name. Remove entries you don't have; add others the same way.
+    // `tint`: the colour washed over the top of the screen while it's focused.
     // `icon`: a path under app/ to use your own image, or false for a plain
     // glass tile with the app's name. Some apps report a poor icon to other
     // apps (YouTube reports its Cobalt engine's pinwheel, Prime Video's may not
     // load, Samsung TV Plus is a system app), so those default to name tiles.
     apps: [
-      { key: 'youtube', label: 'YouTube', ids: ['9Ur5IzDKqV.TizenYouTube', 'com.samsung.tv.cobalt-yt'],
+      { key: 'youtube', tint: '#ff0033', label: 'YouTube', ids: ['9Ur5IzDKqV.TizenYouTube', 'com.samsung.tv.cobalt-yt'],
         names: ['^youtube$'], icon: 'img/apps/youtube.svg' },
-      { key: 'netflix', label: 'Netflix', ids: ['org.tizen.netflix-app'],
+      { key: 'netflix', tint: '#e50914', label: 'Netflix', ids: ['org.tizen.netflix-app'],
         names: ['^netflix$', '\\bnetflix\\b'] },
-      { key: 'prime', label: 'Prime Video', ids: ['org.tizen.primevideo', 'org.tizen.ignition'],
+      { key: 'prime', tint: '#00a8e1', label: 'Prime Video', ids: ['org.tizen.primevideo', 'org.tizen.ignition'],
         names: ['^prime video$', '^amazon prime video$', '\\bprime video\\b'], icon: 'img/apps/primevideo.svg' },
-      { key: 'disney', label: 'Disney+', ids: ['MCmYXNxgcu.DisneyPlus'],
+      { key: 'disney', tint: '#1a3fd6', label: 'Disney+', ids: ['MCmYXNxgcu.DisneyPlus'],
         names: ['^disney plus$', '\\bdisney plus\\b', '^disney$'] },
-      { key: 'hbomax', label: 'HBO Max', ids: ['cj37Ni3qXM.HBONow'],
+      { key: 'hbomax', tint: '#6a2bd9', label: 'HBO Max', ids: ['cj37Ni3qXM.HBONow'],
         names: ['^hbo max$', '^max$'] },
-      { key: 'appletv', label: 'Apple TV', ids: ['com.samsung.tv.aria-video'],
+      { key: 'appletv', tint: '#9a9aa6', label: 'Apple TV', ids: ['com.samsung.tv.aria-video'],
         names: ['^apple tv$'] },
-      { key: 'paramount', label: 'Paramount+', ids: ['rJyOSqC6Up.PPlusIntl'],
+      { key: 'paramount', tint: '#0064ff', label: 'Paramount+', ids: ['rJyOSqC6Up.PPlusIntl'],
         names: ['^paramount plus$'] },
-      { key: 'spotify', label: 'Spotify', ids: ['rJeHak5zRg.Spotify'],
+      { key: 'spotify', tint: '#1db954', label: 'Spotify', ids: ['rJeHak5zRg.Spotify'],
         names: ['^spotify\\b'] },
-      { key: 'browser', label: 'Internet', ids: ['org.tizen.browser'],
+      { key: 'browser', tint: '#3d8bfd', label: 'Internet', ids: ['org.tizen.browser'],
         names: ['^internet$', '^browser$'] }
     ]
   };

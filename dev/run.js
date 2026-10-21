@@ -10,6 +10,7 @@
 //   node dev/run.js --keep          keep the data directory on exit
 //   node dev/run.js --data DIR      use DIR as the data directory
 //   node dev/run.js --no-fetch      no outbound fetches (icons, YouTube titles)
+//   node dev/run.js --tv-apps FILE  use the TV's real apps and icons (JSON of {id, name, show, icon})
 //   node dev/run.js --max-total-bytes N   storage cap for photos and thumbnails
 //                                   (default 500 MB; dev/test-api.sh sets a small one)
 //
@@ -35,6 +36,11 @@ if (!fs.existsSync(path.join(APP, 'js', 'local-key.js'))) {
 const port = Number(opt('--port', 18090));
 const uiPort = Number(opt('--ui-port', 18091));
 const quiet = flag('--quiet');
+const tvApps = opt('--tv-apps', null);
+const tvMock = tvApps ? 'window.GH_MOCK = ' + JSON.stringify({
+  apps: JSON.parse(fs.readFileSync(tvApps, 'utf8')).filter((a) => a.show !== false)
+    .map((a) => ({ id: a.id, name: a.name, iconPath: a.icon }))
+}) + ';' : null;
 let dataDir = opt('--data', null);
 const tempData = !dataDir;
 if (!dataDir) dataDir = path.join(__dirname, 'tmp', 'run-' + Date.now() + '-' + process.pid);
@@ -82,7 +88,11 @@ function serveFrom(base, rel, res) {
 const ui = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://127.0.0.1');
   if (req.method !== 'GET') { res.writeHead(405); return res.end(); }
-  if (u.pathname === '/dev/mock.js') return sendFile(res, path.join(__dirname, 'mock.js'));
+  if (u.pathname === '/dev/mock.js') {
+    // --tv-apps FILE: the TV's real app list and icons (from tv-remote/cdp-tv.js apps)
+    if (tvMock) { res.writeHead(200, { 'Content-Type': 'text/javascript' }); return res.end(tvMock); }
+    return sendFile(res, path.join(__dirname, 'mock.js'));
+  }
   if (u.pathname === '/dev/login') {
     // Dev only: signs this browser in to the website (cookies are per host, not
     // per port, so a cookie set here is sent to the service on :port too).

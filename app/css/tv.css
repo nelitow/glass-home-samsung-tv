@@ -4,7 +4,7 @@
  */
 :root {
   --tile: 156px;
-  --tile-radius: 30px;
+  --tile-radius: 35px;            /* ~22.5% of the tile, Apple's icon corner */
   --gap: 28px;
   --dock-pad-x: 28px;
   --dock-pad-y: 26px;
@@ -12,6 +12,11 @@
   --glass: rgba(28, 28, 30, 0.42);
   --glass-strong: rgba(28, 28, 30, 0.62);
   --glass-border: rgba(255, 255, 255, 0.10);
+  /* Liquid Glass: a light, saturated blur with a bright rim on top and a darker one below */
+  --lg-bg: rgba(255, 255, 255, 0.10);
+  --lg-blur: blur(36px) saturate(190%) brightness(1.06);
+  --lg-rim: inset 0 1.5px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+            inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 18px 30px -18px rgba(255, 255, 255, 0.22);
   --text: #fff;
   --text-2: rgba(255, 255, 255, 0.72);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -97,22 +102,22 @@ html, body {
   text-shadow: 0 2px 22px rgba(0, 0, 0, 0.35);
 }
 #time {
-  font-size: 84px;
-  font-weight: 600;
+  font-size: 60px;
+  font-weight: 500;
   line-height: 1;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
 #time .ampm {
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 500;
   letter-spacing: 0;
   margin-left: 10px;
   opacity: 0.82;
 }
 #date {
-  margin-top: 12px;
-  font-size: 30px;
+  margin-top: 6px;
+  font-size: 24px;
   font-weight: 500;
   color: var(--text-2);
   letter-spacing: 0.005em;
@@ -123,32 +128,62 @@ html, body {
   position: absolute;
   left: 0;
   top: 0;
-  width: 900px;
-  height: 340px;
-  background: radial-gradient(ellipse 70% 80% at 0% 0%, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.20) 45%, rgba(0, 0, 0, 0) 100%);
+  width: 1200px;
+  height: 480px;
+  background: radial-gradient(ellipse 70% 80% at 0% 0%, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0.26) 45%, rgba(0, 0, 0, 0) 100%);
   pointer-events: none;
 }
-#brand {
+#shelf {
   position: absolute;
-  top: 62px;
-  left: 78px;
-  display: flex;
-  align-items: center;
-  gap: 18px;
+  top: 70px;
+  left: 80px;
+  max-width: 1100px;
   text-shadow: 0 2px 22px rgba(0, 0, 0, 0.35);
 }
-#brand-glyph {
-  display: block;
-  width: 80px;
-  height: 80px;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+#greeting {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--text-2);
+  letter-spacing: 0.005em;
 }
-#brand-name {
-  font-size: 46px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.015em;
+#shelf-title, #shelf-sub {
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition: opacity 0.35s ease, transform 0.45s var(--ease);
 }
+#shelf.on #shelf-title, #shelf.on #shelf-sub { opacity: 1; transform: none; }
+#shelf-sub { transition-delay: 0.05s; }
+#shelf-title {
+  margin-top: 14px;
+  font-size: 92px;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#shelf-sub {
+  margin-top: 14px;
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* the focused tile's colour, washed over the top of the photo */
+#shelf-wash, .wash {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 760px;
+  pointer-events: none;
+}
+.wash {
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+.wash.show { opacity: 0.42; }
 
 /* ---------- weather (under the clock) ---------- */
 #weather {
@@ -188,10 +223,10 @@ html, body {
   margin-top: 20px;
   padding: 16px 14px 10px;
   border-radius: 28px;
-  background: rgba(28, 28, 30, 0.34);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
-  backdrop-filter: blur(24px) saturate(150%);
-  border: 1px solid var(--glass-border);
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: var(--lg-rim);
   text-shadow: none;
 }
 #wx-days { display: flex; }
@@ -253,8 +288,9 @@ html, body {
 html.night #night-shade { opacity: 1; }
 
 /* ---------- screensaver: only the photos ---------- */
-#brand, #clock, #shade-top, #shade-left, #shade-bottom { transition: opacity 0.3s ease; }
-html.ambient #brand,
+#shelf, #shelf-wash, #clock, #shade-top, #shade-left, #shade-bottom { transition: opacity 0.3s ease; }
+html.ambient #shelf,
+html.ambient #shelf-wash,
 html.ambient #clock,
 html.ambient #dock,
 html.ambient #label,
@@ -298,21 +334,6 @@ html.lite #wx-week {
   transform: translateX(-50%);
   padding: 0 calc(var(--dock-pad-x) - 16px);
   height: calc(var(--tile) + 2 * var(--dock-pad-y));
-  border-radius: var(--dock-radius);
-  background: var(--glass);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
-#dock::after {
-  /* gentle top highlight, like light on the edge of glass */
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0) 40%);
-  pointer-events: none;
 }
 #dock-viewport {
   position: relative;
@@ -367,16 +388,53 @@ html.lite #wx-week {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
   transform: translateZ(0);
 }
 .tile.focused {
-  transform: translateY(-10px) scale(1.16);
+  transform: translateY(-14px) scale(1.18);
   z-index: 2;
+}
+/* parallax: the focused icon tilts slowly and its highlight follows the light */
+.tile.focused .face { animation: tilt 7s ease-in-out 0.3s infinite; }
+@keyframes tilt {
+  0%   { transform: perspective(700px) rotateX(0deg) rotateY(0deg); }
+  25%  { transform: perspective(700px) rotateX(5deg) rotateY(-7deg); }
+  50%  { transform: perspective(700px) rotateX(-3deg) rotateY(-2deg); }
+  75%  { transform: perspective(700px) rotateX(-5deg) rotateY(7deg); }
+  100% { transform: perspective(700px) rotateX(0deg) rotateY(0deg); }
+}
+.tile .spec {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: var(--lg-rim);
+  pointer-events: none;
+}
+.tile .spec::before {
+  content: "";
+  position: absolute;
+  left: -50%;
+  top: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.tile.focused .spec::before { opacity: 1; animation: spec 7s ease-in-out 0.3s infinite; }
+@keyframes spec {
+  0%   { transform: translate3d(-18%, -30%, 0); }
+  25%  { transform: translate3d(14%, -34%, 0); }
+  50%  { transform: translate3d(4%, -22%, 0); }
+  75%  { transform: translate3d(-16%, -14%, 0); }
+  100% { transform: translate3d(-18%, -30%, 0); }
 }
 .tile.focused .glow { opacity: 1; }
 
@@ -395,7 +453,7 @@ html.lite #wx-week {
   image-rendering: auto;
 }
 .tile .face.plate-light { background: rgba(250, 250, 252, 0.94); }
-.tile .face.plate-glass { background: rgba(255, 255, 255, 0.14); }
+.tile .face.plate-glass { background: rgba(255, 255, 255, 0.16); }
 .tile .name-fallback {
   padding: 16px;
   font-size: 25px;
@@ -434,7 +492,6 @@ html.lite #wx-week {
 }
 .tile-add .face {
   background: rgba(255, 255, 255, 0.07);
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.16);
   color: rgba(255, 255, 255, 0.86);
 }
 .tile-add .plus { width: 58px; height: 58px; }
@@ -485,11 +542,10 @@ html.lite #wx-week {
   min-width: 340px;
   padding: 12px;
   border-radius: 30px;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(32px) saturate(170%);
-  backdrop-filter: blur(32px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  background: rgba(40, 40, 44, 0.38);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), var(--lg-rim);
   transform-origin: 50% 100%;
   opacity: 0;
   visibility: hidden;
@@ -541,11 +597,10 @@ html.lite #wx-week {
   width: 1040px;
   padding: 58px 68px 40px;
   border-radius: 48px;
-  background: rgba(28, 28, 30, 0.60);
-  -webkit-backdrop-filter: blur(44px) saturate(170%);
-  backdrop-filter: blur(44px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: rgba(40, 40, 44, 0.44);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.5), var(--lg-rim);
   opacity: 0;
   visibility: hidden;
   transform: translate(-50%, -47%) scale(0.97);
@@ -672,11 +727,10 @@ html.lite #wx-week {
   max-width: 1200px;
   padding: 18px 34px;
   border-radius: 28px;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(30px) saturate(170%);
-  backdrop-filter: blur(30px) saturate(170%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  background: rgba(40, 40, 44, 0.38);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), var(--lg-rim);
   font-size: 26px;
   font-weight: 500;
   white-space: nowrap;
@@ -693,3 +747,10 @@ html.lite #wx-week {
 html.paused *, html.paused *::before, html.paused *::after { animation-play-state: paused !important; }
 html.still *, html.still *::before, html.still *::after { transition: none !important; animation: none !important; }
 html.lite .bg-layer img { will-change: auto; }
+html.lite .tile .face {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(60, 60, 66, 0.72);
+}
+html.lite .tile.focused .face,
+html.lite .tile.focused .spec::before { animation: none; }
