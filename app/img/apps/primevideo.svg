@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
-  <rect width="256" height="256" fill="#00a8e1"/>
-  <text x="128" y="122" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="44" fill="#fff">prime</text>
-  <text x="128" y="166" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="400" font-size="34" fill="#fff">video</text>
-  <path d="M84 182q44 22 88 0" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/>
-  <path d="M164 174l12 6-8 10" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
