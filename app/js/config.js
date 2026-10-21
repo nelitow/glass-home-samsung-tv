@@ -51,10 +51,10 @@
     // Off until you set your location. Find coordinates with
     // https://geocoding-api.open-meteo.com/v1/search?name=YOUR+TOWN
     weather: {
-      enabled: false,
-      place: '',                 // label under the forecast, e.g. 'Springfield'
-      latitude: 0,
-      longitude: 0,
+      enabled: true,
+      place: 'Tubarão',          // label under the forecast, e.g. 'Springfield'
+      latitude: -28.4667,
+      longitude: -49.0069,
       timezone: 'auto',          // or an IANA name such as 'Europe/London'
       refreshMs: 30 * 60 * 1000
     },
