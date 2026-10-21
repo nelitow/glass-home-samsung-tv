@@ -9,6 +9,10 @@
  * is inserted as HTML: numbers are rounded, labels come from the table below,
  * and the icons are drawn here.
  *
+ * Selecting the card (Up from the dock, then OK) opens a details panel:
+ * feels-like, humidity, wind, UV, rain, sunrise and sunset, the next 24 hours
+ * and the week with temperature ranges (renderDetail below).
+ *
  * Preview (desktop browser): add ?wx=mock to use built-in sample data.
  */
 (function () {
@@ -21,7 +25,7 @@
   if (!cfg || !root) return;
   if (!mockWx && (cfg.enabled === false || (!cfg.latitude && !cfg.longitude))) return;
 
-  var KEY = 'gh.weather.v1';
+  var KEY = 'gh.weather.v2';
   var HIDE_AFTER = 12 * 3600 * 1000;    // older than this: hide rather than mislead
   var NOW_STALE = 3 * 3600 * 1000;      // older than this: drop the "now" temperature
   var REFRESH = cfg.refreshMs || 30 * 60 * 1000;
@@ -237,8 +241,9 @@
   function url() {
     return 'https://api.open-meteo.com/v1/forecast?latitude=' + encodeURIComponent(cfg.latitude) +
       '&longitude=' + encodeURIComponent(cfg.longitude) +
-      '&current=temperature_2m,weather_code,is_day' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max' +
+      '&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m' +
+      '&hourly=temperature_2m,weather_code,precipitation_probability,is_day' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,sunrise,sunset' +
       '&timezone=' + encodeURIComponent(cfg.timezone || 'auto') + '&forecast_days=8';
   }
 
@@ -250,9 +255,23 @@
     var t = [];
     var base = new Date();
     for (var i = 0; i < 8; i++) t.push(localDay(new Date(base.getFullYear(), base.getMonth(), base.getDate() + i)));
+    var ht = [], htemp = [], hcode = [], hrain = [], hday = [];
+    var h0 = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    for (var h = 0; h < 48; h++) {
+      var dt = new Date(h0.getTime() + h * 3600 * 1000);
+      ht.push(localDay(dt) + 'T' + ('0' + dt.getHours()).slice(-2) + ':00');
+      htemp.push(14 + 6 * Math.sin((dt.getHours() - 9) / 24 * 2 * Math.PI));
+      hcode.push(dt.getHours() > 15 && dt.getHours() < 20 ? 61 : 2);
+      hrain.push(dt.getHours() > 15 && dt.getHours() < 20 ? 60 : 10);
+      hday.push(dt.getHours() >= 6 && dt.getHours() < 19 ? 1 : 0);
+    }
     return {
-      current: { temperature_2m: 18.0, weather_code: 2, is_day: 1 },
-      daily: { time: t, weather_code: codes, temperature_2m_max: hi, temperature_2m_min: lo, precipitation_probability_max: rain }
+      current: { temperature_2m: 18.0, weather_code: 2, is_day: 1, apparent_temperature: 17.2, relative_humidity_2m: 72,
+        wind_speed_10m: 14, wind_direction_10m: 135 },
+      hourly: { time: ht, temperature_2m: htemp, weather_code: hcode, precipitation_probability: hrain, is_day: hday },
+      daily: { time: t, weather_code: codes, temperature_2m_max: hi, temperature_2m_min: lo, precipitation_probability_max: rain,
+        precipitation_sum: [0.4, 6, 9, 1, 0, 0, 0.2, 4], uv_index_max: [6, 3, 2, 5, 7, 8, 7, 4],
+        sunrise: t.map(function (x) { return x + 'T05:41'; }), sunset: t.map(function (x) { return x + 'T18:52'; }) }
     };
   }
 
@@ -287,6 +306,135 @@
     clearInterval(timer);
     timer = setInterval(load, REFRESH);
   }
+
+  // ---------- details panel ----------
+  var hourFmt = null;
+  try { hourFmt = new Intl.DateTimeFormat(GH.config.locale || undefined, { hour: 'numeric', minute: '2-digit' }); } catch (e) { /* fallback */ }
+
+  // "2026-10-21T05:41" -> a local Date (Open-Meteo gives local times with timezone=auto)
+  function parseLocal(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(s || ''));
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
+  }
+  function clock(dt) {
+    if (!dt) return '–';
+    try { if (hourFmt) return hourFmt.format(dt).replace(/\s?([AP])\.?M\.?$/i, function (x, p) { return p.toLowerCase() === 'a' ? 'am' : 'pm'; }); } catch (e) { /* fall through */ }
+    return dt.getHours() + ':' + ('0' + dt.getMinutes()).slice(-2);
+  }
+  function hourLabel(dt) {
+    var h = dt.getHours();
+    var t = clock(dt);
+    return /[ap]m$/.test(t) ? ((h % 12) || 12) + (h < 12 ? ' am' : ' pm') : t;
+  }
+  function compass(d) {
+    return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((d % 360) + 360) % 360 / 45) % 8];
+  }
+  function uvWord(u) { return u < 3 ? 'Low' : u < 6 ? 'Moderate' : u < 8 ? 'High' : u < 11 ? 'Very high' : 'Extreme'; }
+
+  function stat(box, title, value, note) {
+    var s = el('div', 'wxd-stat');
+    s.appendChild(el('div', 'wxd-stat-title', title));
+    s.appendChild(el('div', 'wxd-stat-value', value));
+    if (note) s.appendChild(el('div', 'wxd-stat-note', note));
+    box.appendChild(s);
+  }
+
+  // Fills `box` with the details; returns false when there is no forecast to show.
+  function renderDetail(box) {
+    box.textContent = '';
+    var rec = last;
+    if (!rec || !valid(rec.data) || Date.now() - rec.at > HIDE_AFTER) return false;
+    var j = rec.data, c = j.current, d = j.daily, hr = j.hourly;
+    var i0 = d.time.indexOf(localDay(new Date()));
+    if (i0 < 0) return false;
+    var night = c.is_day === 0;
+    var nowInfo = info(num(c.weather_code) ? c.weather_code : d.weather_code[i0]);
+
+    // header: place, big icon and temperature, condition, high/low, feels like
+    var head = el('div', 'wxd-head');
+    var big = el('div', 'wxd-icon');
+    big.innerHTML = iconSvg(nowInfo[2], night);
+    head.appendChild(big);
+    var ht = el('div', 'wxd-headtext');
+    ht.appendChild(el('div', 'wxd-place', cfg.place || 'Weather'));
+    ht.appendChild(el('div', 'wxd-temp', deg(c.temperature_2m)));
+    var sub = [nowInfo[night ? 1 : 0]];
+    if (num(d.temperature_2m_max[i0])) sub.push('H ' + deg(d.temperature_2m_max[i0]) + '  L ' + deg(d.temperature_2m_min[i0]));
+    ht.appendChild(el('div', 'wxd-cond', sub.join('  ·  ')));
+    head.appendChild(ht);
+    box.appendChild(head);
+
+    // stats
+    var stats = el('div', 'wxd-stats');
+    if (num(c.apparent_temperature)) stat(stats, 'Feels like', deg(c.apparent_temperature),
+      Math.abs(c.apparent_temperature - c.temperature_2m) < 2 ? 'Similar to the actual temperature' : c.apparent_temperature < c.temperature_2m ? 'Wind is making it feel cooler' : 'Humidity is making it feel warmer');
+    if (num(c.relative_humidity_2m)) stat(stats, 'Humidity', Math.round(c.relative_humidity_2m) + '%');
+    if (num(c.wind_speed_10m)) stat(stats, 'Wind', Math.round(c.wind_speed_10m) + ' km/h', num(c.wind_direction_10m) ? 'From the ' + compass(c.wind_direction_10m) : '');
+    var uv = d.uv_index_max && d.uv_index_max[i0];
+    if (num(uv)) stat(stats, 'UV index', String(Math.round(uv)), uvWord(uv) + ' today');
+    var mm = d.precipitation_sum && d.precipitation_sum[i0];
+    var pp = d.precipitation_probability_max && d.precipitation_probability_max[i0];
+    if (num(mm) || num(pp)) stat(stats, 'Rain today', num(mm) ? (Math.round(mm * 10) / 10) + ' mm' : '–', num(pp) ? Math.round(pp) + '% chance' : '');
+    if (d.sunrise && d.sunset) stat(stats, 'Sunrise', clock(parseLocal(d.sunrise[i0])), 'Sunset ' + clock(parseLocal(d.sunset[i0])));
+    box.appendChild(stats);
+
+    // next 24 hours, every 2 hours
+    if (hr && hr.time && hr.time.length) {
+      var now = new Date();
+      var key = localDay(now) + 'T' + ('0' + now.getHours()).slice(-2) + ':00';
+      var h0 = hr.time.indexOf(key);
+      if (h0 >= 0) {
+        var row = el('div', 'wxd-hours');
+        for (var h = h0; h < hr.time.length && h <= h0 + 24; h += 2) {
+          var cell = el('div', 'wxd-hour');
+          cell.appendChild(el('div', 'wxd-hour-time', h === h0 ? 'Now' : hourLabel(parseLocal(hr.time[h]))));
+          var ic = el('div', 'wx-icon');
+          ic.innerHTML = iconSvg(info(hr.weather_code[h])[2], hr.is_day && hr.is_day[h] === 0);
+          cell.appendChild(ic);
+          cell.appendChild(el('div', 'wxd-hour-temp', num(hr.temperature_2m[h]) ? deg(hr.temperature_2m[h]) : '–'));
+          var r = hr.precipitation_probability && hr.precipitation_probability[h];
+          cell.appendChild(el('div', 'wx-rain', num(r) && r >= 20 ? Math.round(r) + '%' : ''));
+          row.appendChild(cell);
+        }
+        box.appendChild(row);
+      }
+    }
+
+    // the week, with each day's range on a shared scale
+    var lo = Infinity, hi = -Infinity, last7 = Math.min(d.time.length - 1, i0 + 6);
+    for (var a = i0; a <= last7; a++) {
+      if (num(d.temperature_2m_min[a])) lo = Math.min(lo, d.temperature_2m_min[a]);
+      if (num(d.temperature_2m_max[a])) hi = Math.max(hi, d.temperature_2m_max[a]);
+    }
+    var week = el('div', 'wxd-week');
+    for (var i = i0; i <= last7; i++) {
+      var line = el('div', 'wxd-day');
+      line.appendChild(el('div', 'wxd-day-name', i === i0 ? 'Today' : weekday(String(d.time[i]))));
+      var di = el('div', 'wx-icon');
+      di.innerHTML = iconSvg(info(d.weather_code[i])[2], false);
+      line.appendChild(di);
+      var dr = d.precipitation_probability_max && d.precipitation_probability_max[i];
+      line.appendChild(el('div', 'wx-rain', num(dr) && dr >= 20 ? Math.round(dr) + '%' : ''));
+      line.appendChild(el('div', 'wxd-day-lo', deg(d.temperature_2m_min[i])));
+      var track = el('div', 'wxd-track');
+      var bar = el('div', 'wxd-bar');
+      var span = hi - lo || 1;
+      bar.style.left = ((d.temperature_2m_min[i] - lo) / span * 100) + '%';
+      bar.style.width = Math.max(4, (d.temperature_2m_max[i] - d.temperature_2m_min[i]) / span * 100) + '%';
+      track.appendChild(bar);
+      line.appendChild(track);
+      line.appendChild(el('div', 'wxd-day-hi', deg(d.temperature_2m_max[i])));
+      week.appendChild(line);
+    }
+    box.appendChild(week);
+    box.appendChild(el('div', 'wxd-foot', 'Weather: Open-Meteo · updated ' + clock(new Date(rec.at))));
+    return true;
+  }
+
+  GH.Weather = {
+    isOn: function () { return root.classList.contains('on'); },
+    renderDetail: renderDetail
+  };
 
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { clearInterval(timer); timer = null; return; }

@@ -172,6 +172,7 @@
         tint: s.type === 'youtube' ? '#ff0033' : 'hsl(' + hueFor(hostOf(s.url) || s.name || '') + ', 70%, 50%)'
       });
     });
+    if (cfg.vibe) list.push({ kind: 'vibe', key: 'vibe', label: 'Vibe', tint: '#ff8a3d' });
     list.push({ kind: 'add', key: 'add', label: 'Add photos and shortcuts' });
     return list;
   }
@@ -295,6 +296,8 @@
         fail();
       }
       face.appendChild(div('play'));
+    } else if (it.kind === 'vibe') {
+      face.appendChild(div('vibe-orb'));
     } else {
       face.appendChild(plusGlyph());
     }
@@ -397,6 +400,7 @@
     if (it.kind === 'app') return 'Press OK to open';
     if (it.kind === 'youtube') return 'YouTube';
     if (it.kind === 'web') return hostOf(it.url);
+    if (it.kind === 'vibe') return 'Warm light for the room';
     return 'From your phone, on the home Wi-Fi';
   }
 
@@ -538,6 +542,55 @@
     setGridFocus(to);
   }
 
+  // ---------- weather: Up from the dock selects the card, OK opens details ----------
+  var wxPanel = $('wx-panel');
+
+  function focusWeather() {
+    mode = 'weather';
+    S.move();
+    $('weather').classList.add('focused');
+    items.forEach(function (it) { var t = tileEls[it.key]; if (t) t.el.classList.remove('focused'); });
+    label.classList.remove('on');
+  }
+
+  function leaveWeather() {
+    mode = 'dock';
+    $('weather').classList.remove('focused');
+    label.classList.add('on');
+    setFocus(focus, true);
+  }
+
+  function openWeather() {
+    if (!GH.Weather.renderDetail(wxPanel)) { S.bump(); return; }
+    S.select();
+    mode = 'wxpanel';
+    scrim.classList.add('open');
+    wxPanel.classList.add('open');
+    dock.classList.add('away');
+  }
+
+  function closeWeather() {
+    scrim.classList.remove('open');
+    wxPanel.classList.remove('open');
+    dock.classList.remove('away');
+    mode = 'weather';
+  }
+
+  // ---------- vibe: warm light drifting across the screen, nothing else ----------
+  function openVibe() {
+    mode = 'vibe';
+    document.documentElement.classList.add('vibe');
+    label.classList.remove('on');
+    if (backdrop) backdrop.pause();
+  }
+
+  function closeVibe() {
+    mode = 'dock';
+    document.documentElement.classList.remove('vibe');
+    label.classList.add('on');
+    if (backdrop) backdrop.resume();
+  }
+
   // ---------- now playing (other apps' media, e.g. Spotify) ----------
   function onNowPlaying(info) {
     nowInfo = info;
@@ -570,6 +623,7 @@
     if (!it) return;
     S.select();
     if (it.kind === 'add') { openPanel(); return; }
+    if (it.kind === 'vibe') { S.select(); openVibe(); return; }
     var p;
     if (it.kind === 'app') p = P.launchApp(it.id);
     else if (it.kind === 'web') p = P.openUrl(it.url);
@@ -590,7 +644,7 @@
 
   function openMenu() {
     var it = items[focus];
-    if (!it || it.kind === 'add') return;
+    if (!it || it.kind === 'add' || it.kind === 'vibe') return;
     var group = groupOf(it);
     var gi = group.indexOf(it);
     menuItems = [
@@ -795,6 +849,9 @@
       if (mode === 'menu') { S.back(); closeMenu(); }
       else if (mode === 'panel') { S.back(); closePanel(); }
       else if (mode === 'grid') { S.back(); exitGrid(); }
+      else if (mode === 'wxpanel') { S.back(); closeWeather(); }
+      else if (mode === 'vibe') { S.back(); closeVibe(); }
+      else if (mode === 'weather') { S.back(); leaveWeather(); }
       return;                                   // at the top level Back does nothing
     }
     if ([KEY.LEFT, KEY.RIGHT, KEY.UP, KEY.DOWN, KEY.ENTER].indexOf(k) < 0) return;
@@ -834,6 +891,17 @@
       return;
     }
     if (mode === 'grid') { gridKey(k, e); return; }
+    if (mode === 'vibe') { if (k === KEY.ENTER && !e.repeat) { S.back(); closeVibe(); } return; }
+    if (mode === 'wxpanel') {
+      if (k === KEY.ENTER && !e.repeat) { S.back(); closeWeather(); }
+      return;
+    }
+    if (mode === 'weather') {
+      if (k === KEY.ENTER) { if (!e.repeat) openWeather(); }
+      else if (k === KEY.DOWN) { S.move(); leaveWeather(); }
+      else S.bump();
+      return;
+    }
     if (k === KEY.LEFT || k === KEY.RIGHT) {
       var to = focus + (k === KEY.LEFT ? -1 : 1);
       if (to < 0 || to >= items.length) S.bump();
@@ -841,7 +909,7 @@
     } else if (k === KEY.DOWN) {
       if (gridItems.length) enterGrid(); else S.bump();
     } else if (k === KEY.UP) {
-      S.bump();
+      if (GH.Weather && GH.Weather.isOn()) focusWeather(); else S.bump();
     } else if (k === KEY.ENTER) {
       if (enterDown) return;                    // auto-repeat while held
       enterDown = true;
@@ -1078,6 +1146,8 @@
     loadMock().then(resolveApps).then(loadGrid).then(function () {
       nowPlaying.start();
       if (Q.grid === '1') enterGrid();
+      if (Q.vibe === '1') openVibe();
+      if (Q.wx === 'panel') setTimeout(function () { focusWeather(); openWeather(); }, 300);
       if (Q.focus && /^\d+$/.test(Q.focus)) setFocus(+Q.focus);
       ensureService();
       if (Q.panel === '1') setTimeout(openPanel, 300);

@@ -59,6 +59,9 @@
       refreshMs: 30 * 60 * 1000
     },
 
+    // A "Vibe" tile on the dock: warm light drifting over a dark screen.
+    vibe: true,
+
     // Interface sounds (js/sounds.js): a tick on every move, synthesised.
     sounds: true,
     soundVolume: 0.6,
