@@ -13,6 +13,11 @@
  * feels-like, humidity, wind, UV, rain, sunrise and sunset, the next 24 hours
  * and the week with temperature ranges (renderDetail below).
  *
+ * GH.Weather.now() gives the conditions to the rest of the app (js/sky.js:
+ * the weather over the photos and the rain alert); onUpdate(fn) is told
+ * whenever a forecast arrives. 15-minute precipitation (minutely_15) gives
+ * when the next rain starts.
+ *
  * Preview (desktop browser): add ?wx=mock to use built-in sample data.
  */
 (function () {
@@ -243,6 +248,7 @@
       '&longitude=' + encodeURIComponent(cfg.longitude) +
       '&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m' +
       '&hourly=temperature_2m,weather_code,precipitation_probability,is_day' +
+      '&minutely_15=precipitation,weather_code&forecast_minutely_15=16' +
       '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,uv_index_max,sunrise,sunset' +
       '&timezone=' + encodeURIComponent(cfg.timezone || 'auto') + '&forecast_days=8';
   }
@@ -277,8 +283,8 @@
 
   var loading = false;
   function load() {
-    if (mock) { last = { at: Date.now(), data: sample() }; render(); return; }
-    if (loading || !window.fetch) { render(); return; }
+    if (mock) { last = { at: Date.now(), data: sample() }; render(); notify(); return; }
+    if (loading || !window.fetch) { render(); notify(); return; }
     loading = true;
     var ctrl = window.AbortController ? new window.AbortController() : null;
     var guard = ctrl ? setTimeout(function () { ctrl.abort(); }, 15000) : null;
@@ -299,6 +305,7 @@
         loading = false;
         if (guard) clearTimeout(guard);
         render();
+        notify();
       });
   }
 
@@ -431,9 +438,76 @@
     return true;
   }
 
+  // ---------- for other modules ----------
+  function wet(code) { return (code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95; }
+
+  // When the next rain starts, from the 15-minute forecast (each value is the
+  // total of the preceding 15 minutes), else from the hourly one.
+  function nextRain(j, nowMs) {
+    var m = j.minutely_15;
+    var i, end, c;
+    if (m && m.time && m.precipitation && m.time.length) {
+      for (i = 0; i < m.time.length; i++) {
+        end = parseLocal(m.time[i]);
+        if (!end || end.getTime() <= nowMs) continue;
+        var mm = m.precipitation[i];
+        c = m.weather_code ? m.weather_code[i] : null;
+        if (num(mm) && (mm >= 0.3 || (mm >= 0.1 && (!num(c) || wet(c))))) {
+          return { at: Math.max(end.getTime() - 15 * 60 * 1000, nowMs), code: num(c) && wet(c) ? c : 61 };
+        }
+      }
+      return null;
+    }
+    var hr = j.hourly;
+    if (!hr || !hr.time) return null;
+    for (i = 0; i < hr.time.length; i++) {
+      end = parseLocal(hr.time[i]);
+      if (!end || end.getTime() + 3600 * 1000 <= nowMs) continue;
+      if (end.getTime() > nowMs + 6 * 3600 * 1000) break;
+      c = hr.weather_code[i];
+      var p = hr.precipitation_probability ? hr.precipitation_probability[i] : null;
+      if (wet(c) && (!num(p) || p >= 50)) return { at: Math.max(end.getTime(), nowMs), code: c };
+    }
+    return null;
+  }
+
+  // The conditions now, or null without a recent forecast. sunrise and sunset
+  // are today's; code, kind (icon name), humidity and the rain timing need a
+  // forecast from the last 3 hours.
+  function now() {
+    var rec = last;
+    if (!rec || !valid(rec.data) || Date.now() - rec.at > HIDE_AFTER) return null;
+    var j = rec.data, c = j.current, d = j.daily;
+    var i0 = d.time.indexOf(localDay(new Date()));
+    var out = {
+      sunrise: i0 >= 0 && d.sunrise ? parseLocal(d.sunrise[i0]) : null,
+      sunset: i0 >= 0 && d.sunset ? parseLocal(d.sunset[i0]) : null,
+      code: null, kind: null, isDay: c.is_day !== 0, humidity: null, raining: false, rainAt: null, rainCode: null
+    };
+    if (Date.now() - rec.at > NOW_STALE) return out;
+    var t = Date.now();
+    var r = nextRain(j, t);
+    out.code = num(c.weather_code) ? c.weather_code : (i0 >= 0 ? d.weather_code[i0] : null);
+    out.kind = out.code == null ? null : info(out.code)[2];
+    out.humidity = num(c.relative_humidity_2m) ? c.relative_humidity_2m : null;
+    out.raining = wet(out.code) || !!(r && r.at <= t + 5 * 60 * 1000);
+    if (r && !out.raining) { out.rainAt = new Date(r.at); out.rainCode = r.code; }
+    return out;
+  }
+
+  var listeners = [];
+  function notify() {
+    for (var i = 0; i < listeners.length; i++) { try { listeners[i](); } catch (e) { /* keep the others going */ } }
+  }
+
   GH.Weather = {
     isOn: function () { return root.classList.contains('on'); },
-    renderDetail: renderDetail
+    renderDetail: renderDetail,
+    now: now,
+    onUpdate: function (fn) { listeners.push(fn); },
+    icon: iconSvg,
+    info: info,
+    clock: clock
   };
 
   document.addEventListener('visibilitychange', function () {

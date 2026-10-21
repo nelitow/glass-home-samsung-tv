@@ -38,7 +38,7 @@
 
   function enter() {
     if (document.hidden) return;
-    if (isOpen('panel') || isOpen('menu')) { arm(); return; }
+    if (isOpen('panel') || isOpen('menu') || isOpen('wx-panel') || html.classList.contains('vibe')) { arm(); return; }
     html.classList.add('ambient');
   }
 

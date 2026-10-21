@@ -14,7 +14,7 @@
     if (!tz) {
       if (GH.query.np !== '1') return null;
       return { appId: 'rJeHak5zRg.Spotify', state: 'PLAY', title: 'Don’t Stop Believin’', artist: 'Journey',
-        album: 'The Essential Journey', picture: null, position: 30171, duration: 248907 };
+        album: 'The Essential Journey', picture: GH.query.npart || null, position: 30171, duration: 248907 };
     }
     try {
       if (!client) client = tz.mediacontroller.getClient();

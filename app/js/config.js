@@ -56,8 +56,26 @@
       latitude: -28.4667,
       longitude: -49.0069,
       timezone: 'auto',          // or an IANA name such as 'Europe/London'
-      refreshMs: 30 * 60 * 1000
+      refreshMs: 15 * 60 * 1000
     },
+
+    // The photos follow the real sky (js/sky.js): rain on the glass, fog,
+    // storms, a warm wash at dawn and golden hour, and a banner when rain is
+    // about to start. Bundled photos tagged dawn/day/golden/night in
+    // wallpapers/manifest.json show at that time of day (your own always do).
+    livingSky: true,
+    timeOfDayPhotos: true,
+    rainAlert: true,
+
+    // While music plays, the screen takes on the album art's colours.
+    albumColours: true,
+
+    // Apps open with the icon zooming to fill the screen.
+    launchAnimation: true,
+
+    // Festa junina bunting in June, Christmas lights in December, fireworks at
+    // midnight on New Year's Eve (js/seasons.js).
+    seasons: true,
 
     // A "Vibe" tile on the dock: warm light drifting over a dark screen.
     vibe: true,

@@ -42,6 +42,7 @@
     move: function () { tone(1650, 0.045, 0.22, 1400); },
     select: function () { tone(880, 0.09, 0.30, 1320); },
     bump: function () { tone(220, 0.07, 0.30, 160); },
-    back: function () { tone(1100, 0.07, 0.22, 700); }
+    back: function () { tone(1100, 0.07, 0.22, 700); },
+    chime: function () { tone(1320, 0.5, 0.16); setTimeout(function () { tone(1760, 0.7, 0.12); }, 150); }
   };
 }());

@@ -794,6 +794,208 @@ html.vibe #vibe .glow { animation-play-state: running; }
 @keyframes breathe { from { opacity: 0.7; } to { opacity: 1; } }
 @keyframes flicker { 0%, 100% { opacity: 0.8; } 20% { opacity: 0.95; } 45% { opacity: 0.72; } 70% { opacity: 1; } }
 
+/* ---------- living sky (js/sky.js): weather and time of day over the photos ---------- */
+#sky, #sky > div, .sky-drops, .sky-rain { position: absolute; inset: 0; pointer-events: none; }
+#sky { overflow: hidden; }
+.sky-tint { opacity: 0; transition: opacity 6s ease; }
+.t-golden { background: linear-gradient(180deg, rgba(255, 150, 70, 0.34) 0%, rgba(255, 120, 60, 0.14) 45%, rgba(150, 50, 90, 0.22) 100%); }
+.t-dawn { background: linear-gradient(180deg, rgba(255, 170, 195, 0.28) 0%, rgba(255, 205, 165, 0.12) 50%, rgba(120, 140, 210, 0.14) 100%); }
+.t-gloom { background: linear-gradient(180deg, rgba(25, 32, 45, 0.42) 0%, rgba(30, 38, 50, 0.22) 60%, rgba(20, 25, 35, 0.3) 100%); }
+#sky.golden .t-golden, #sky.dawn .t-dawn, #sky.gloom .t-gloom { opacity: 1; }
+.sky-haze { opacity: 0; transition: opacity 6s ease; }
+#sky.haze .sky-haze { opacity: 0.45; }
+#sky.fog .sky-haze { opacity: 0.85; }
+.haze-a, .haze-b {
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: 70%;
+  bottom: -10%;
+  background: radial-gradient(ellipse 30% 55% at 25% 60%, rgba(235, 238, 242, 0.55), transparent 70%),
+              radial-gradient(ellipse 28% 50% at 70% 55%, rgba(235, 238, 242, 0.45), transparent 70%);
+  animation: haze 70s ease-in-out infinite alternate;
+}
+.haze-b { bottom: 25%; height: 60%; opacity: 0.7; animation-duration: 95s; animation-direction: alternate-reverse; }
+@keyframes haze { from { transform: translate3d(-8%, 0, 0); } to { transform: translate3d(8%, 0, 0); } }
+.sky-rain { left: -10%; right: -10%; transform: rotate(8deg); }
+.streak {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(220, 235, 255, 0.85));
+  animation: fall 0.7s linear infinite;
+  will-change: transform;
+}
+@keyframes fall { from { transform: translate3d(0, -220px, 0); } to { transform: translate3d(0, 1300px, 0); } }
+.drop, .bead {
+  position: absolute;
+  border-radius: 50% 50% 48% 48% / 42% 42% 58% 58%;
+  background: radial-gradient(circle at 38% 30%, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.16) 38%, rgba(255, 255, 255, 0.05) 62%, rgba(255, 255, 255, 0) 72%);
+  box-shadow: inset 0 -2px 2px rgba(0, 0, 0, 0.18), 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+.drop { animation: slide 14s ease-in infinite; will-change: transform, opacity; }
+@keyframes slide {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  6% { opacity: 1; }
+  30% { transform: translate3d(0, 40px, 0); }
+  45% { transform: translate3d(1px, 52px, 0); }
+  70% { transform: translate3d(-1px, 420px, 0); }
+  100% { transform: translate3d(2px, 1150px, 0); opacity: 0.8; }
+}
+.bead { animation: bead 8s ease-in-out infinite; }
+@keyframes bead { 0%, 100% { opacity: 0; } 20%, 75% { opacity: 0.9; } }
+.flake {
+  position: absolute;
+  top: 0;
+  border-radius: 50%;
+  background: #fff;
+  animation: snow 12s linear infinite;
+  will-change: transform;
+}
+@keyframes snow {
+  0% { transform: translate3d(0, -20px, 0); }
+  25% { transform: translate3d(22px, 260px, 0); }
+  50% { transform: translate3d(-12px, 540px, 0); }
+  75% { transform: translate3d(18px, 820px, 0); }
+  100% { transform: translate3d(0, 1110px, 0); }
+}
+.sky-flash { background: rgba(225, 232, 255, 1); opacity: 0; }
+html.vibe #sky .sky-drops { display: none; }
+
+/* ---------- rain alert ---------- */
+#rain-alert {
+  position: absolute;
+  top: 476px;
+  right: 80px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 28px 14px 18px;
+  border-radius: 28px;
+  background: rgba(30, 60, 90, 0.42);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), var(--lg-rim);
+  opacity: 0;
+  transform: translate3d(0, -14px, 0) scale(0.97);
+  transition: opacity 0.5s ease, transform 0.6s var(--ease);
+}
+#rain-alert.on { opacity: 1; transform: none; }
+.ra-icon { width: 58px; height: 58px; flex: none; }
+.ra-title { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+.ra-sub { margin-top: 4px; font-size: 20px; color: var(--text-2); }
+html.in-grid #rain-alert { opacity: 0; }
+
+/* ---------- album colours ---------- */
+#art-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 2.5s ease; }
+html.art-on #art-glow { opacity: 1; }
+.art-pulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 55% 70% at 100% 0%, rgba(var(--art2), 0.5), rgba(var(--art2), 0) 70%),
+              radial-gradient(ellipse 65% 60% at 0% 100%, rgba(var(--art1), 0.5), rgba(var(--art1), 0) 70%);
+  animation: artPulse 5s ease-in-out infinite alternate;
+}
+@keyframes artPulse { from { opacity: 0.65; } to { opacity: 1; } }
+html.art-on { --lg-bg: rgba(var(--art1), 0.2); }
+html.art-on #np { background: linear-gradient(120deg, rgba(var(--art1), 0.62), rgba(var(--art2), 0.45)); }
+html.art-on #np-state i { background: #fff; }
+
+/* ---------- launch zoom ---------- */
+#launch { position: absolute; inset: 0; z-index: 10; visibility: hidden; pointer-events: none; }
+#launch.on { visibility: visible; }
+.launch-card {
+  position: absolute;
+  overflow: hidden;
+  border-radius: var(--tile-radius, 30px);
+  will-change: transform;
+}
+.launch-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.launch-name { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 22px; font-weight: 600; }
+.launch-splash {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  border-radius: 50px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 600;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+}
+.launch-splash img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---------- seasons (js/seasons.js) ---------- */
+#season { position: absolute; inset: 0; pointer-events: none; }
+.season-wire { position: absolute; left: 0; top: 0; }
+.flag { position: absolute; width: 30px; height: 40px; transform-origin: 50% 0; }
+.cloth {
+  width: 100%;
+  height: 100%;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 74%, 0 100%);
+  transform-origin: 50% 0;
+  animation: sway 3s ease-in-out infinite alternate;
+  box-shadow: inset 0 3px 0 rgba(0, 0, 0, 0.15);
+}
+@keyframes sway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+.bulb {
+  position: absolute;
+  width: 12px;
+  height: 18px;
+  border-radius: 45% 45% 50% 50% / 35% 35% 65% 65%;
+  background: var(--c);
+  transform-origin: 50% 0;
+  box-shadow: inset 0 -3px 4px rgba(0, 0, 0, 0.25);
+}
+.bulb::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: #2b3a2f;
+}
+.bulb-glow {
+  position: absolute;
+  left: -22px;
+  top: -18px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--c) 0%, rgba(0, 0, 0, 0) 68%);
+  opacity: 0.8;
+  animation: twinkle 2.4s ease-in-out infinite alternate;
+}
+@keyframes twinkle { 0% { opacity: 0.25; } 60% { opacity: 0.85; } 100% { opacity: 1; } }
+.burst { position: absolute; width: 0; height: 0; }
+.spark, .fw-trail { position: absolute; left: -4px; top: -4px; width: 8px; height: 8px; border-radius: 50%; }
+.fw-trail { width: 4px; height: 18px; left: -2px; border-radius: 2px; }
+.ny-year {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 300px;
+  text-align: center;
+  font-size: 220px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #fff;
+  text-shadow: 0 0 40px rgba(255, 214, 10, 0.6), 0 0 120px rgba(255, 159, 10, 0.45);
+  animation: nyIn 2.5s ease-out both, nyGlow 3s ease-in-out 2.5s infinite alternate;
+}
+@keyframes nyIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
+@keyframes nyGlow { from { opacity: 0.85; } to { opacity: 1; } }
+html.vibe #season, html.vibe #rain-alert { opacity: 0; }
+
 /* ---------- long-press menu ---------- */
 #menu {
   position: absolute;

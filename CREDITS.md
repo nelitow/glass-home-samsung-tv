@@ -2,7 +2,7 @@
 
 ## Background photos
 
-All twelve bundled photos are dedicated to the public domain under
+All twenty-two bundled photos are dedicated to the public domain under
 [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) and come from Wikimedia
 Commons. Each licence was checked on its file page. Thank you to the photographers.
 
@@ -20,6 +20,16 @@ Commons. Each licence was checked on its file page. Thank you to the photographe
 | `nature-10.jpg` | Valle de la Luna, Atacama Desert, Chile | Hailey Kean | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Clouds_Over_The_Desert_(Unsplash_AKuzZrpJJew).jpg) |
 | `nature-11.jpg` | The Matterhorn at sunset, Switzerland | Sam Ferrara | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Matterhorn_sunset_2016_(Unsplash).jpg) |
 | `nature-12.jpg` | Blue Mountains, New South Wales | Matthew Kane | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Blue_Mountains_-_Unsplash.jpg) |
+| `nature-13.jpg` | The Milky Way over a mountain lake | Andrew Coelho | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Milky_Way_Lake_Mountains_(Unsplash).jpg) |
+| `nature-14.jpg` | Starry sky over a mountain lake | Priscilla Du Preez | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Starry_sky_over_a_mountain_and_a_lake_(Unsplash).jpg) |
+| `nature-15.jpg` | Granite cliffs under the stars, Yosemite, USA | Jordan McQueen | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Yosemite_cliff_under_stars_(Unsplash).jpg) |
+| `nature-16.jpg` | Starry sky over the Tatras | Štefan Štefančík | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Starry_sky_over_the_Tatras_(Unsplash).jpg) |
+| `nature-17.jpg` | Orange clouds over the mountains | Nitish Meena | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Orange_clouds_over_mountains_(Unsplash).jpg) |
+| `nature-18.jpg` | A small boat on a calm lake at sunset | Johannes Plenio | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Golden_sunset_silhouette_of_a_small_boat_on_a_calm_lake.jpg) |
+| `nature-19.jpg` | Sunset over a loch, Scotland | Danka & Peter | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Scotland_lake_sunset_(Unsplash).jpg) |
+| `nature-20.jpg` | Peyto Lake at dusk, Banff National Park, Canada | Mark Basarab | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Sunset_over_Peyto_Lake_(Unsplash).jpg) |
+| `nature-21.jpg` | Morning mist over green hills | Joshua Sortino | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Into_the_Mist_(Unsplash).jpg) |
+| `nature-22.jpg` | A lake in morning fog | Simon Buchou | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:The_silence_of_light_(Unsplash).jpg) |
 
 ## Weather
 

@@ -4,83 +4,221 @@
     "title": "Moraine Lake at sunrise, Banff National Park, Canada",
     "author": "Garrett Parker",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Sunrise_(Unsplash_DlkF4-dbCOU).jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Sunrise_(Unsplash_DlkF4-dbCOU).jpg",
+    "times": [
+      "dawn"
+    ]
   },
   {
     "file": "nature-02.jpg",
     "title": "Spruce forest at Holma, Lysekil, Sweden",
     "author": "W.carter",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Spruce_forest_at_Holma.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Spruce_forest_at_Holma.jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-03.jpg",
     "title": "The Twelve Apostles, Great Ocean Road, Victoria",
     "author": "Bernard Spragg",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Twelve_Apostles_20_(8653703745).jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Twelve_Apostles_20_(8653703745).jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-04.jpg",
     "title": "Aurora over Flakstad, Lofoten, Norway",
     "author": "Johannes Groll",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Lofoten,_Norway_(Unsplash).jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Lofoten,_Norway_(Unsplash).jpg",
+    "times": [
+      "night"
+    ]
   },
   {
     "file": "nature-05.jpg",
     "title": "The Palouse hills from Steptoe Butte, Washington, USA",
     "author": "Caleb Riston",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:PalouseFromSteptoeButteMay2023-1.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:PalouseFromSteptoeButteMay2023-1.jpg",
+    "times": [
+      "golden",
+      "dawn"
+    ]
   },
   {
     "file": "nature-06.jpg",
     "title": "Cradle Mountain above Dove Lake, Tasmania",
     "author": "Dhx1",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Dove_Lake_Circuit_Walking_Track,_Cradle_Mountain_-_Lake_St_Clair_National_Park_06.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Dove_Lake_Circuit_Walking_Track,_Cradle_Mountain_-_Lake_St_Clair_National_Park_06.jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-07.jpg",
     "title": "Western Alps in morning haze, seen from near Grenoble, France",
     "author": "Dktue",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:View_in_an_easterly_direction_towards_the_Western_Alps_at_the_location_of_Grenoble.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:View_in_an_easterly_direction_towards_the_Western_Alps_at_the_location_of_Grenoble.jpg",
+    "times": [
+      "dawn"
+    ]
   },
   {
     "file": "nature-08.jpg",
     "title": "Autumn at Jigoku-numa, Hakkoda Mountains, Japan",
     "author": "lumoplank",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Hakkoda_Mountains,_Part_II-_Foothills_-_Hakkoda6929.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Hakkoda_Mountains,_Part_II-_Foothills_-_Hakkoda6929.jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-09.jpg",
     "title": "Sankenbach Waterfalls, Black Forest, Germany",
     "author": "Leonhard Lenz",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Sankenbach_Waterfalls_2020-03-12_89.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Sankenbach_Waterfalls_2020-03-12_89.jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-10.jpg",
     "title": "Valle de la Luna, Atacama Desert, Chile",
     "author": "Hailey Kean",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Clouds_Over_The_Desert_(Unsplash_AKuzZrpJJew).jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Clouds_Over_The_Desert_(Unsplash_AKuzZrpJJew).jpg",
+    "times": [
+      "day"
+    ]
   },
   {
     "file": "nature-11.jpg",
     "title": "The Matterhorn at sunset, Switzerland",
     "author": "Sam Ferrara",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Matterhorn_sunset_2016_(Unsplash).jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Matterhorn_sunset_2016_(Unsplash).jpg",
+    "times": [
+      "golden"
+    ]
   },
   {
     "file": "nature-12.jpg",
     "title": "Blue Mountains, New South Wales",
     "author": "Matthew Kane",
     "licence": "CC0 1.0 Universal Public Domain Dedication",
-    "source": "https://commons.wikimedia.org/wiki/File:Blue_Mountains_-_Unsplash.jpg"
+    "source": "https://commons.wikimedia.org/wiki/File:Blue_Mountains_-_Unsplash.jpg",
+    "times": [
+      "day"
+    ]
+  },
+  {
+    "file": "nature-13.jpg",
+    "title": "The Milky Way over a mountain lake",
+    "author": "Andrew Coelho",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Milky_Way_Lake_Mountains_(Unsplash).jpg",
+    "times": [
+      "night"
+    ]
+  },
+  {
+    "file": "nature-14.jpg",
+    "title": "Starry sky over a mountain lake",
+    "author": "Priscilla Du Preez",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Starry_sky_over_a_mountain_and_a_lake_(Unsplash).jpg",
+    "times": [
+      "night"
+    ]
+  },
+  {
+    "file": "nature-15.jpg",
+    "title": "Granite cliffs under the stars, Yosemite, USA",
+    "author": "Jordan McQueen",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Yosemite_cliff_under_stars_(Unsplash).jpg",
+    "times": [
+      "night"
+    ]
+  },
+  {
+    "file": "nature-16.jpg",
+    "title": "Starry sky over the Tatras",
+    "author": "Štefan Štefančík",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Starry_sky_over_the_Tatras_(Unsplash).jpg",
+    "times": [
+      "night"
+    ]
+  },
+  {
+    "file": "nature-17.jpg",
+    "title": "Orange clouds over the mountains",
+    "author": "Nitish Meena",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Orange_clouds_over_mountains_(Unsplash).jpg",
+    "times": [
+      "golden"
+    ]
+  },
+  {
+    "file": "nature-18.jpg",
+    "title": "A small boat on a calm lake at sunset",
+    "author": "Johannes Plenio",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Golden_sunset_silhouette_of_a_small_boat_on_a_calm_lake.jpg",
+    "times": [
+      "golden"
+    ]
+  },
+  {
+    "file": "nature-19.jpg",
+    "title": "Sunset over a loch, Scotland",
+    "author": "Danka & Peter",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Scotland_lake_sunset_(Unsplash).jpg",
+    "times": [
+      "golden"
+    ]
+  },
+  {
+    "file": "nature-20.jpg",
+    "title": "Peyto Lake at dusk, Banff National Park, Canada",
+    "author": "Mark Basarab",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Sunset_over_Peyto_Lake_(Unsplash).jpg",
+    "times": [
+      "dawn",
+      "golden"
+    ]
+  },
+  {
+    "file": "nature-21.jpg",
+    "title": "Morning mist over green hills",
+    "author": "Joshua Sortino",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:Into_the_Mist_(Unsplash).jpg",
+    "times": [
+      "dawn"
+    ]
+  },
+  {
+    "file": "nature-22.jpg",
+    "title": "A lake in morning fog",
+    "author": "Simon Buchou",
+    "licence": "CC0 1.0 Universal Public Domain Dedication",
+    "source": "https://commons.wikimedia.org/wiki/File:The_silence_of_light_(Unsplash).jpg",
+    "times": [
+      "dawn"
+    ]
   }
 ]

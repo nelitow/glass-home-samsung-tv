@@ -5,7 +5,9 @@
  * off-screen, placed in the hidden layer, then faded in over the visible one
  * (1.6 s). Each photo drifts very slowly (scale 1.00 -> 1.06, Ken Burns).
  * Photos that fail to load are skipped. The order is shuffled once a day;
- * newly uploaded photos jump the queue so they show up next.
+ * newly uploaded photos jump the queue so they show up next. opts.eligible(it)
+ * limits the rotation to photos that suit the moment (the time of day); when
+ * none do, all are used.
  * Only transform and opacity are animated.
  */
 (function () {
@@ -111,9 +113,12 @@
     }
     this._ensureOrder();
     var cur = this.current && this.current.key;
+    var ok = this.opts.eligible;
+    var pool = ok ? this.order.filter(function (key) { return ok(self.byKey[key]) && !self._isBad(key); }) : [];
+    if (!ok || !pool.length || (pool.length === 1 && pool[0] === cur)) pool = this.order;
     function firstUnseen() {
-      for (var i = 0; i < self.order.length; i++) {
-        var key = self.order[i];
+      for (var i = 0; i < pool.length; i++) {
+        var key = pool[i];
         if (key !== cur && !self._isBad(key) && self.seen.indexOf(key) < 0) return self.byKey[key];
       }
       return null;

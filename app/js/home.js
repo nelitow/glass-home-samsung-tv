@@ -409,8 +409,10 @@
     shelfKey = it.key;
     var next = washA.classList.contains('show') ? washB : washA;
     var prev = next === washA ? washB : washA;
-    if (it.tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + it.tint + ' 0%, transparent 70%)';
-    next.classList.toggle('show', !!it.tint);
+    var np = playingIn(it);
+    var tint = artTint && np && np.state === 'PLAY' ? artTint : it.tint;
+    if (tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + tint + ' 0%, transparent 70%)';
+    next.classList.toggle('show', !!tint);
     prev.classList.remove('show');
     $('shelf').classList.remove('on');
     clearTimeout(shelfTimer);
@@ -614,8 +616,122 @@
       var t = tileEls[it.key];
       if (t) t.el.classList.toggle('playing', !!(playingIn(it) && info.state === 'PLAY'));
     });
+    albumColours(info);
     var cur = mode === 'grid' ? gridItems[gridFocus] : items[focus];
     if (cur) renderShelf(cur, true);
+  }
+
+  // While music plays, the album art's colours glow over the photos and tint
+  // the glass (html.art-on, --art1 / --art2). Without readable art: the
+  // playing app's own colour.
+  var artTint = null;
+  var artKey = null;
+  function hexRgb(h) {
+    var m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h || '');
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+  }
+  function albumColours(info) {
+    var root = document.documentElement;
+    if (cfg.albumColours === false || !info || info.state !== 'PLAY') {
+      root.classList.remove('art-on');
+      artTint = null;
+      artKey = null;
+      return;
+    }
+    var key = info.appId + '|' + (info.picture || info.album);
+    if (key === artKey) return;
+    artKey = key;
+    GH.artColors(info.picture).then(function (c) {
+      if (artKey !== key) return;
+      if (!c) {
+        var app = items.filter(function (it) { return playingIn(it); })[0];
+        var rgb = hexRgb(app && app.tint);
+        c = rgb ? [rgb, rgb.map(function (v) { return Math.round(v * 0.55); })] : null;
+      }
+      if (!c) { root.classList.remove('art-on'); artTint = null; return; }
+      root.style.setProperty('--art1', c[0].join(', '));
+      root.style.setProperty('--art2', c[1].join(', '));
+      artTint = 'rgb(' + c[0].join(', ') + ')';
+      root.classList.add('art-on');
+      var cur = mode === 'grid' ? gridItems[gridFocus] : items[focus];
+      if (cur) renderShelf(cur, true);
+    });
+  }
+
+  // ---------- launch: the icon grows to fill the screen, and shrinks back on return ----------
+  var launchEl = $('launch');
+  var launching = null;          // { anims, guard }
+
+  function tileFor(it) {
+    if (it.el) return it.el;
+    var t = tileEls[it.key];
+    return t ? t.el : null;
+  }
+
+  function startLaunch(it) {
+    if (cfg.launchAnimation === false || Q.still === '1' || !document.body.animate) return false;
+    var tile = tileFor(it);
+    var face = tile && tile.querySelector('.face');
+    if (!face) return false;
+    endLaunch(true);
+    var sr = stage.getBoundingClientRect();
+    var s = sr.width / 1920;
+    var r = face.getBoundingClientRect();
+    var x = (r.left - sr.left) / s, y = (r.top - sr.top) / s, w = r.width / s, h = r.height / s;
+    var card = div('launch-card');
+    card.style.left = x + 'px';
+    card.style.top = y + 'px';
+    card.style.width = w + 'px';
+    card.style.height = h + 'px';
+    card.style.background = it.tint || '#111114';
+    var icon = face.querySelector('img');
+    var big = icon ? icon.cloneNode(false) : div('launch-name');
+    if (!icon) big.textContent = it.label;
+    big.className = icon ? 'launch-img' : 'launch-name';
+    card.appendChild(big);
+    var splash = div('launch-splash');
+    if (icon) { var si = icon.cloneNode(false); si.className = ''; splash.appendChild(si); } else splash.textContent = it.label;
+    launchEl.textContent = '';
+    launchEl.appendChild(card);
+    launchEl.appendChild(splash);
+    launchEl.classList.add('on');
+    var scale = Math.max(1920 / w, 1080 / h) * 1.6;
+    var dx = 960 - (x + w / 2), dy = 540 - (y + h / 2);
+    var ease = 'cubic-bezier(0.55, 0, 0.25, 1)';
+    launching = {
+      anims: [
+        card.animate([{ transform: 'translate3d(0, 0, 0) scale(1)' },
+          { transform: 'translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(' + scale.toFixed(2) + ')' }],
+          { duration: 520, easing: ease, fill: 'forwards' }),
+        big.animate([{ opacity: 1 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 520, easing: 'ease-in', fill: 'forwards' }),
+        splash.animate([{ opacity: 0, transform: 'scale(0.86)' }, { opacity: 1, transform: 'scale(1)' }],
+          { duration: 320, delay: 360, easing: 'ease-out', fill: 'both' })
+      ],
+      guard: null
+    };
+    return true;
+  }
+
+  // Plays the zoom backwards (back to the tile), or just clears it.
+  function endLaunch(now) {
+    if (!launching) return;
+    var l = launching;
+    launching = null;
+    clearTimeout(l.guard);
+    if (now || document.hidden) {
+      l.anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* ignore */ } });
+      launchEl.classList.remove('on');
+      launchEl.textContent = '';
+      return;
+    }
+    l.anims[2].reverse();
+    l.anims[1].reverse();
+    l.anims[0].reverse();
+    l.anims[0].onfinish = function () {
+      if (launching) return;
+      launchEl.classList.remove('on');
+      launchEl.textContent = '';
+    };
   }
 
   // ---------- opening things ----------
@@ -624,17 +740,28 @@
     S.select();
     if (it.kind === 'add') { openPanel(); return; }
     if (it.kind === 'vibe') { S.select(); openVibe(); return; }
-    var p;
-    if (it.kind === 'app') p = P.launchApp(it.id);
-    else if (it.kind === 'web') p = P.openUrl(it.url);
-    else p = P.openYouTube(it, ytMode);
-    p.then(function (how) {
-      if (String(how).indexOf('preview:') === 0) toast('Preview: would open ' + it.label);
-      else if (how === 'youtube-home') toast('YouTube opened, but not at this video');
-      else if (how === 'browser-home') toast('The browser opened without the address');
-    }, function (e) {
-      toast('Couldn’t open ' + it.label + (e && e.message ? ' (' + e.message + ')' : ''), 4500);
-    });
+    // The app starts loading at once; the zoom plays while it does.
+    var zoom = startLaunch(it);
+    (function () {
+      var p;
+      if (it.kind === 'app') p = P.launchApp(it.id);
+      else if (it.kind === 'web') p = P.openUrl(it.url);
+      else p = P.openYouTube(it, ytMode);
+      p.then(function (how) {
+        if (String(how).indexOf('preview:') === 0) {
+          toast('Preview: would open ' + it.label);
+          if (zoom && launching) launching.guard = setTimeout(function () { endLaunch(); }, 1200);
+          return;
+        }
+        if (how === 'youtube-home') toast('YouTube opened, but not at this video');
+        else if (how === 'browser-home') toast('The browser opened without the address');
+        // the app normally hides this page; if it never does, come back
+        if (launching) launching.guard = setTimeout(function () { endLaunch(); }, 8000);
+      }, function (e) {
+        endLaunch();
+        toast('Couldn’t open ' + it.label + (e && e.message ? ' (' + e.message + ')' : ''), 4500);
+      });
+    }());
   }
 
   // ---------- long-press menu ----------
@@ -844,6 +971,7 @@
   // ---------- keys ----------
   function onKeyDown(e) {
     var k = e.keyCode;
+    if (launching) endLaunch(true);           // a key during the zoom: back to normal at once
     if (k === KEY.BACK || k === KEY.ESC || (k === KEY.BACKSPACE && cfg.preview)) {
       e.preventDefault();
       if (mode === 'menu') { S.back(); closeMenu(); }
@@ -964,6 +1092,7 @@
           key: 'w:' + file,
           url: base + file,
           credit: [w.title, w.author, w.licence_short || shortLicence(w.licence || w.license)].filter(Boolean).join(' · '),
+          times: Array.isArray(w.times) && w.times.length ? w.times : null,
           user: false
         };
       }).filter(Boolean);
@@ -990,6 +1119,13 @@
     });
     if (st && st.photos) ls.set('gh.bg.known', list.map(function (p) { return p.id; }));
     backdrop.setPhotos(bundled.concat(user));
+  }
+
+  // Bundled photos are tagged with the parts of the day they suit (dawn, day,
+  // golden, night); yours always fit.
+  function rightTime(it) {
+    if (cfg.timeOfDayPhotos === false || !it.times || !GH.Sky || !GH.Sky.period()) return true;
+    return it.times.indexOf(GH.Sky.period()) >= 0;
   }
 
   var creditTimer = null;
@@ -1065,8 +1201,10 @@
       $('toast').classList.remove('on');
       if (backdrop) backdrop.pause();
       if (nowPlaying) nowPlaying.stop();
+      if (launching) clearTimeout(launching.guard);
       return;
     }
+    if (launching) setTimeout(function () { endLaunch(); }, 150);
     document.documentElement.classList.remove('paused');
     renderClock();
     clearInterval(clockTimer);
@@ -1130,7 +1268,11 @@
 
     backdrop = new GH.Backdrop($('bg-a'), $('bg-b'), {
       interval: cfg.photoIntervalMs, fade: cfg.fadeMs, scale: cfg.kenBurnsScale,
-      still: Q.still === '1', onShow: showCredit
+      still: Q.still === '1', onShow: showCredit, eligible: rightTime
+    });
+    // A new part of the day: move on from a photo that no longer fits it.
+    if (GH.Sky) GH.Sky.onPeriod(function () {
+      if (backdrop.current && !rightTime(backdrop.current)) backdrop.advance();
     });
     loadManifest().then(function () {
       updatePhotos();
