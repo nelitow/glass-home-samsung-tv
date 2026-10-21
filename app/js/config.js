@@ -59,6 +59,26 @@
       refreshMs: 30 * 60 * 1000
     },
 
+    // Interface sounds (js/sounds.js): a tick on every move, synthesised.
+    sounds: true,
+    soundVolume: 0.6,
+
+    // How often to check what other apps are playing (js/nowplaying.js).
+    nowPlayingEveryMs: 3000,
+
+    // The app grid under the dock (Down from the dock): every store app that
+    // isn't already in the dock, A-Z. `include` adds built-in apps by Tizen ID,
+    // `exclude` hides apps, `icons` gives an app your own icon (by Tizen ID).
+    grid: {
+      include: ['org.tizen.netflix-app', 'org.tizen.primevideo', 'org.tizen.browser', 'com.samsung.tv.aria-video'],
+      exclude: ['2022ePop01.SmartTV', '5b8c3eb16b.BeamCTVDev', 'h6D3hH79er.emanual', 'J9fZJDMi1v.SecurityCenter'],
+      icons: {
+        'Jz7aUrV2Q4.Twitch': 'img/apps/twitch.png',
+        'GHI3a0zMSx.XboxGamePass': 'img/apps/xbox.png',
+        'AQKO41xyKP.AmazonAlexa': 'img/apps/alexa.png'
+      }
+    },
+
     // Screensaver (js/ambient.js): only the photos after this long idle.
     ambient: { enabled: true, afterMs: 3 * 60 * 1000 },
 

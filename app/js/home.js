@@ -2,7 +2,7 @@
  * Glass Home - home screen.
  *
  * Remote keys (no registration needed): Left/Right move along the dock (no
- * wrap), OK opens, holding OK for 0.7 s opens a small menu (Move left, Move
+ * wrap), Down goes into the app grid and Up from its first row comes back, OK opens, holding OK for 0.7 s opens a small menu (Move left, Move
  * right, Remove or Hide, Cancel), Back closes menus and does nothing at the
  * top level. While the app is hidden (another app in front) every timer and
  * animation is paused.
@@ -37,6 +37,9 @@
   var viewport = $('dock-viewport');
   var row = $('dock-row');
   var label = $('label');
+  var ui = $('ui');
+  var gridEl = $('grid');
+  var S = GH.Sounds;
   var menu = $('menu');
   var panel = $('panel');
   var scrim = $('scrim');
@@ -76,6 +79,11 @@
   var hidden = ls.get('gh.hidden') || [];
   var appOrder = ls.get('gh.appOrder') || [];
   var ytMode = ls.get('gh.ytMode') || cfg.youtubeMode;
+  var allApps = [];
+  var gridItems = [];
+  var gridFocus = 0;
+  var nowInfo = null;
+  var nowPlaying = null;
   if (YT_MODES.indexOf(ytMode) < 0) ytMode = 'payload';
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -379,15 +387,21 @@
   var shelfKey = null;
   var shelfTimer = null;
 
+  function playingIn(it) {
+    return nowInfo && it && it.kind === 'app' && it.id === nowInfo.appId ? nowInfo : null;
+  }
+
   function shelfSubFor(it) {
+    var np = playingIn(it);
+    if (np) return (np.state === 'PLAY' ? 'Now Playing · ' : 'Paused · ') + np.title + (np.artist ? ' — ' + np.artist : '');
     if (it.kind === 'app') return 'Press OK to open';
     if (it.kind === 'youtube') return 'YouTube';
     if (it.kind === 'web') return hostOf(it.url);
     return 'From your phone, on the home Wi-Fi';
   }
 
-  function renderShelf(it) {
-    if (it.key === shelfKey) return;
+  function renderShelf(it, force) {
+    if (it.key === shelfKey && !force) return;
     shelfKey = it.key;
     var next = washA.classList.contains('show') ? washB : washA;
     var prev = next === washA ? washB : washA;
@@ -422,9 +436,139 @@
     }
   }
 
+  // ---------- app grid: every other app, A-Z, under the dock ----------
+  var COLS = 8;
+  var CELL = TILE_MAX + 28;                 // column pitch
+  var ROW_H = TILE_MAX + 72;                // room for the focused name
+  var GRID_TOP = 1080 + 60;                 // just below the screen until scrolled up
+  var GRID_LEFT = (1920 - (COLS * CELL - 28)) / 2;
+
+  function appName(name) { return String(name || '').split(' - ')[0].trim(); }
+
+  function buildGrid() {
+    var g = cfg.grid || { include: [], exclude: [], icons: {} };
+    var inDock = {};
+    var seen = {};                          // by name: the TV lists some apps twice
+    Object.keys(apps).forEach(function (k) {
+      inDock[apps[k].id] = true;
+      seen[P.norm(appName(apps[k].name))] = true;
+      seen[P.norm(defByKey[k].label)] = true;
+    });
+    gridItems = allApps.filter(function (a) {
+      if (inDock[a.id] || a.id.indexOf(P.packageId + '.') === 0 || g.exclude.indexOf(a.id) >= 0) return false;
+      if (g.include.indexOf(a.id) < 0 && !/^[A-Za-z0-9]{10}\.[A-Za-z]/.test(a.id)) return false;
+      var n = P.norm(appName(a.name));
+      if (seen[n]) return false;
+      seen[n] = true;
+      return true;
+    }).sort(function (a, b) { return appName(a.name).toLowerCase() < appName(b.name).toLowerCase() ? -1 : 1; })
+      .map(function (a) {
+        return { kind: 'app', key: 'grid:' + a.id, id: a.id, label: appName(a.name), tint: null,
+          icon: g.icons[a.id] || P.iconUrl(a.iconPath) };
+      });
+    gridEl.textContent = '';
+    gridEl.style.top = GRID_TOP + 'px';
+    gridEl.style.left = GRID_LEFT + 'px';
+    gridItems.forEach(function (it, i) {
+      var el = makeTile(it);
+      el.appendChild(div('tile-name', it.label));
+      el.style.left = (i % COLS) * CELL + 'px';
+      el.style.top = Math.floor(i / COLS) * ROW_H + 'px';
+      it.el = el;
+      gridEl.appendChild(el);
+    });
+    if (mode === 'grid') {
+      if (gridItems.length) setGridFocus(clamp(gridFocus, 0, gridItems.length - 1));
+      else exitGrid();
+    }
+  }
+
+  function loadGrid() {
+    return P.listApps().then(function (list) { allApps = list; buildGrid(); });
+  }
+
+  function setGridFocus(i) {
+    gridFocus = i;
+    gridItems.forEach(function (it, idx) { it.el.classList.toggle('focused', idx === i); });
+    var row = Math.floor(i / COLS);
+    var shift = GRID_TOP - 250 + Math.max(0, row - 2) * ROW_H;
+    ui.style.transform = 'translate3d(0, ' + (-shift) + 'px, 0)';
+    renderShelf(gridItems[i]);
+  }
+
+  function enterGrid() {
+    // the column under the focused dock tile
+    var cx = layoutDock();
+    var col = clamp(Math.round((cx - GRID_LEFT - TILE_MAX / 2) / CELL), 0, Math.min(COLS, gridItems.length) - 1);
+    mode = 'grid';
+    document.documentElement.classList.add('in-grid');
+    label.classList.remove('on');
+    S.move();
+    setGridFocus(col);
+  }
+
+  function exitGrid() {
+    mode = 'dock';
+    document.documentElement.classList.remove('in-grid');
+    gridItems.forEach(function (it) { it.el.classList.remove('focused'); });
+    ui.style.transform = '';
+    label.classList.add('on');
+    renderShelf(items[focus]);
+  }
+
+  function gridKey(k, e) {
+    var n = gridItems.length;
+    var i = gridFocus;
+    var col = i % COLS;
+    var to = i;
+    if (k === KEY.ENTER) { if (!e.repeat) activate(gridItems[i]); return; }
+    if (k === KEY.UP) {
+      if (i < COLS) { S.move(); exitGrid(); return; }
+      to = i - COLS;
+    } else if (k === KEY.DOWN) {
+      if (i + COLS < n) to = i + COLS;
+      else if (Math.floor(i / COLS) < Math.floor((n - 1) / COLS)) to = n - 1;
+    } else if (k === KEY.LEFT) {
+      if (col > 0) to = i - 1;
+    } else if (k === KEY.RIGHT) {
+      if (col < COLS - 1 && i + 1 < n) to = i + 1;
+    }
+    if (to === i) { S.bump(); return; }
+    S.move();
+    setGridFocus(to);
+  }
+
+  // ---------- now playing (other apps' media, e.g. Spotify) ----------
+  function onNowPlaying(info) {
+    nowInfo = info;
+    var np = $('np');
+    np.classList.toggle('on', !!info);
+    if (info) {
+      $('np-title').textContent = info.title;
+      $('np-artist').textContent = info.artist || info.album;
+      $('np-state').className = info.state === 'PLAY' ? 'playing' : 'paused';
+      var art = $('np-art');
+      art.textContent = '';
+      if (info.picture) {
+        var img = new Image();
+        img.alt = '';
+        img.onerror = function () { img.remove(); };
+        img.src = info.picture;
+        art.appendChild(img);
+      }
+    }
+    items.forEach(function (it) {
+      var t = tileEls[it.key];
+      if (t) t.el.classList.toggle('playing', !!(playingIn(it) && info.state === 'PLAY'));
+    });
+    var cur = mode === 'grid' ? gridItems[gridFocus] : items[focus];
+    if (cur) renderShelf(cur, true);
+  }
+
   // ---------- opening things ----------
   function activate(it) {
     if (!it) return;
+    S.select();
     if (it.kind === 'add') { openPanel(); return; }
     var p;
     if (it.kind === 'app') p = P.launchApp(it.id);
@@ -648,8 +792,9 @@
     var k = e.keyCode;
     if (k === KEY.BACK || k === KEY.ESC || (k === KEY.BACKSPACE && cfg.preview)) {
       e.preventDefault();
-      if (mode === 'menu') closeMenu();
-      else if (mode === 'panel') closePanel();
+      if (mode === 'menu') { S.back(); closeMenu(); }
+      else if (mode === 'panel') { S.back(); closePanel(); }
+      else if (mode === 'grid') { S.back(); exitGrid(); }
       return;                                   // at the top level Back does nothing
     }
     if ([KEY.LEFT, KEY.RIGHT, KEY.UP, KEY.DOWN, KEY.ENTER].indexOf(k) < 0) return;
@@ -666,7 +811,7 @@
         var d = k === KEY.UP ? -1 : 1;
         var j = menuFocus + d;
         while (j >= 0 && j < menuItems.length && menuItems[j].disabled) j += d;
-        if (j >= 0 && j < menuItems.length) { menuFocus = j; renderMenuFocus(); }
+        if (j >= 0 && j < menuItems.length) { menuFocus = j; renderMenuFocus(); S.move(); } else S.bump();
       }
       return;
     }
@@ -685,11 +830,19 @@
         panelFocus = Math.min(small - 1, panelFocus + 1);
       }
       renderPanelFocus();
+      S.move();
       return;
     }
-    if (k === KEY.LEFT) setFocus(focus - 1);
-    else if (k === KEY.RIGHT) setFocus(focus + 1);
-    else if (k === KEY.ENTER) {
+    if (mode === 'grid') { gridKey(k, e); return; }
+    if (k === KEY.LEFT || k === KEY.RIGHT) {
+      var to = focus + (k === KEY.LEFT ? -1 : 1);
+      if (to < 0 || to >= items.length) S.bump();
+      else { setFocus(to); S.move(); }
+    } else if (k === KEY.DOWN) {
+      if (gridItems.length) enterGrid(); else S.bump();
+    } else if (k === KEY.UP) {
+      S.bump();
+    } else if (k === KEY.ENTER) {
       if (enterDown) return;                    // auto-repeat while held
       enterDown = true;
       longFired = false;
@@ -843,6 +996,7 @@
       enterDown = false;
       $('toast').classList.remove('on');
       if (backdrop) backdrop.pause();
+      if (nowPlaying) nowPlaying.stop();
       return;
     }
     document.documentElement.classList.remove('paused');
@@ -852,8 +1006,9 @@
     clockTimer = setInterval(renderClock, cfg.clockEveryMs);
     pollTimer = setInterval(refresh, cfg.pollEveryMs);
     if (backdrop) backdrop.resume();
+    if (nowPlaying) nowPlaying.start();
     ensureService();
-    resolveApps();
+    resolveApps().then(loadGrid);
   }
 
   // ---------- performance guard ----------
@@ -919,7 +1074,10 @@
     document.addEventListener('keyup', onKeyUp, true);
     document.addEventListener('visibilitychange', onVisibility);
 
-    loadMock().then(resolveApps).then(function () {
+    nowPlaying = new GH.NowPlaying(onNowPlaying);
+    loadMock().then(resolveApps).then(loadGrid).then(function () {
+      nowPlaying.start();
+      if (Q.grid === '1') enterGrid();
       if (Q.focus && /^\d+$/.test(Q.focus)) setFocus(+Q.focus);
       ensureService();
       if (Q.panel === '1') setTimeout(openPanel, 300);

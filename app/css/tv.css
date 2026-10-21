@@ -133,11 +133,21 @@ html, body {
   background: radial-gradient(ellipse 70% 80% at 0% 0%, rgba(0, 0, 0, 0.50) 0%, rgba(0, 0, 0, 0.26) 45%, rgba(0, 0, 0, 0) 100%);
   pointer-events: none;
 }
+#ui {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transition: transform 0.55s var(--ease);
+  will-change: transform;
+}
+
 #shelf {
   position: absolute;
   top: 70px;
   left: 80px;
-  max-width: 1100px;
+  max-width: 1000px;
   text-shadow: 0 2px 22px rgba(0, 0, 0, 0.35);
 }
 #greeting {
@@ -289,6 +299,9 @@ html.night #night-shade { opacity: 1; }
 
 /* ---------- screensaver: only the photos ---------- */
 #shelf, #shelf-wash, #clock, #shade-top, #shade-left, #shade-bottom { transition: opacity 0.3s ease; }
+html.ambient #np,
+html.ambient #grid,
+html.ambient #grid-shade,
 html.ambient #shelf,
 html.ambient #shelf-wash,
 html.ambient #clock,
@@ -533,6 +546,109 @@ html.lite #wx-week {
   will-change: transform;
 }
 #label.on { opacity: 1; }
+
+/* ---------- app grid (under the dock) ---------- */
+#grid-shade {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+html.in-grid #grid-shade { opacity: 1; }
+
+html.in-grid #dock, html.in-grid #credit { opacity: 0; }
+#grid { position: absolute; }
+#grid .tile { position: absolute; }
+.tile .tile-name {
+  position: absolute;
+  left: -60px;
+  right: -60px;
+  top: calc(100% + 14px);
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.tile.focused .tile-name { opacity: 1; }
+
+/* ---------- now playing ---------- */
+#np {
+  position: absolute;
+  top: 70px;
+  right: 400px;
+  max-width: 440px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 22px 10px 10px;
+  border-radius: 26px;
+  background: rgba(40, 40, 44, 0.38);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), var(--lg-rim);
+  opacity: 0;
+  transform: translate3d(0, -10px, 0);
+  transition: opacity 0.4s ease, transform 0.45s var(--ease);
+}
+#np.on { opacity: 1; transform: none; }
+#np-art {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+#np-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+#np-text { min-width: 0; line-height: 1.2; }
+#np-title, #np-artist { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#np-title { font-size: 22px; font-weight: 600; }
+#np-artist { font-size: 19px; color: var(--text-2); }
+#np-state {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+#np-state i {
+  display: block;
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: #fff;
+  transform-origin: 50% 100%;
+  transform: scaleY(0.35);
+}
+#np-state.playing i { animation: eq 0.9s ease-in-out infinite alternate; }
+#np-state.playing i:nth-child(2) { animation-delay: -0.3s; }
+#np-state.playing i:nth-child(3) { animation-delay: -0.6s; }
+#np-state.paused i { opacity: 0.5; }
+@keyframes eq {
+  0% { transform: scaleY(0.25); }
+  100% { transform: scaleY(1); }
+}
+/* a playing app's dock tile gets a small badge */
+.tile.playing::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff radial-gradient(circle, #1c1c1e 0 5px, transparent 6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  animation: np-pulse 1.6s ease-in-out infinite alternate;
+}
+@keyframes np-pulse { from { opacity: 0.75; } to { opacity: 1; } }
 
 /* ---------- long-press menu ---------- */
 #menu {

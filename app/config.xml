@@ -27,6 +27,7 @@
     <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
     <tizen:privilege name="http://tizen.org/privilege/application.info"/>
     <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/mediacontroller.client"/>
 
     <tizen:profile name="tv-samsung"/>
     <tizen:metadata key="http://samsung.com/tv/metadata/multitasking.support" value="true"/>

@@ -83,6 +83,22 @@
     });
   };
 
+  // Every app the TV reports as user-visible: [{ id, name, iconPath }].
+  P.listApps = function () {
+    var keep = function (list) {
+      return (list || []).filter(function (a) { return a && a.id && a.show !== false; })
+        .map(function (a) { return { id: a.id, name: a.name, iconPath: a.iconPath || null }; });
+    };
+    if (!tz) return Promise.resolve(keep(window.GH_MOCK && window.GH_MOCK.apps));
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () { resolve([]); }, 4000);
+      try {
+        tz.application.getAppsInfo(function (list) { clearTimeout(timer); resolve(keep(list)); },
+          function () { clearTimeout(timer); resolve([]); });
+      } catch (e) { clearTimeout(timer); resolve([]); }
+    });
+  };
+
   P.iconUrl = function (iconPath) {
     if (!iconPath) return null;
     var s = String(iconPath);

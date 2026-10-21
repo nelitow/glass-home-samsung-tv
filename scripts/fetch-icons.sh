@@ -1,12 +1,14 @@
 #!/bin/sh
 # Downloads each dock app's official icon from its App Store listing into
 # app/img/apps/<key>.png (512 x 512). Pairs are <key>:<App Store id>; the key
-# matches `key` in app/js/config.js, which points `icon` at the file.
+# matches `key` in app/js/config.js (or a `grid.icons` entry there), which
+# points the icon at the file.
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p app/img/apps
 for pair in youtube:544007664 netflix:363590051 prime:545519333 disney:1446075923 \
-            hbomax:1666653815 appletv:1174078549 paramount:1340650234 spotify:324684580; do
+            hbomax:1666653815 appletv:1174078549 paramount:1340650234 spotify:324684580 \
+            twitch:460177396 xbox:736179781 alexa:944011620; do
   key=${pair%%:*}
   id=${pair#*:}
   art=$(curl -fsS "https://itunes.apple.com/lookup?id=$id&country=br" |
