@@ -742,6 +742,8 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
 
 /* ---------- vibe: warm light ---------- */
 .tile-vibe .face { background: radial-gradient(circle at 50% 60%, #3a1a0c 0%, #140805 100%); }
+.tile-samsung .face { background: linear-gradient(150deg, #1428a0 0%, #0a1657 100%); color: #fff; }
+.tile .home-glyph { width: 58%; height: 58%; opacity: 0.95; }
 .tile .vibe-orb {
   width: 64%;
   height: 64%;

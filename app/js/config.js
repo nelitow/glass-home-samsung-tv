@@ -80,6 +80,11 @@
     // A "Vibe" tile on the dock: warm light drifting over a dark screen.
     vibe: true,
 
+    // A "Samsung Home" tile on the dock that opens the TV's own Smart Hub
+    // home screen (the app id Samsung's Home button normally opens). Set to a
+    // different app id to point it elsewhere, or false to drop the tile.
+    samsungHome: 'com.samsung.tv.csfs',
+
     // Interface sounds (js/sounds.js): a tick on every move, synthesised.
     sounds: true,
     soundVolume: 0.6,

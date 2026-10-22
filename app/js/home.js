@@ -173,6 +173,7 @@
       });
     });
     if (cfg.vibe) list.push({ kind: 'vibe', key: 'vibe', label: 'Vibe', tint: '#ff8a3d' });
+    if (cfg.samsungHome) list.push({ kind: 'samsung', key: 'samsung', label: 'Samsung Home', id: cfg.samsungHome, tint: '#1428a0' });
     list.push({ kind: 'add', key: 'add', label: 'Add photos and shortcuts' });
     return list;
   }
@@ -298,6 +299,20 @@
       face.appendChild(div('play'));
     } else if (it.kind === 'vibe') {
       face.appendChild(div('vibe-orb'));
+    } else if (it.kind === 'samsung') {
+      var ns = 'http://www.w3.org/2000/svg';
+      var hs = document.createElementNS(ns, 'svg');
+      hs.setAttribute('viewBox', '0 0 48 48');
+      hs.setAttribute('class', 'home-glyph');
+      var hp = document.createElementNS(ns, 'path');
+      hp.setAttribute('d', 'M24 8 L40 22 M24 8 L8 22 M12 19 V38 H36 V19 M20 38 V28 H28 V38');
+      hp.setAttribute('fill', 'none');
+      hp.setAttribute('stroke', 'currentColor');
+      hp.setAttribute('stroke-width', '2.6');
+      hp.setAttribute('stroke-linecap', 'round');
+      hp.setAttribute('stroke-linejoin', 'round');
+      hs.appendChild(hp);
+      face.appendChild(hs);
     } else {
       face.appendChild(plusGlyph());
     }
@@ -401,6 +416,7 @@
     if (it.kind === 'youtube') return 'YouTube';
     if (it.kind === 'web') return hostOf(it.url);
     if (it.kind === 'vibe') return 'Warm light for the room';
+    if (it.kind === 'samsung') return 'Open Samsung Smart Hub';
     return 'From your phone, on the home Wi-Fi';
   }
 
@@ -740,6 +756,14 @@
     S.select();
     if (it.kind === 'add') { openPanel(); return; }
     if (it.kind === 'vibe') { S.select(); openVibe(); return; }
+    if (it.kind === 'samsung') {
+      P.launchApp(it.id).then(function (how) {
+        if (String(how).indexOf('preview:') === 0) toast('Preview: would open Samsung Home');
+      }, function (e) {
+        toast('Couldn’t open Samsung Home' + (e && e.message ? ' (' + e.message + ')' : ''), 4500);
+      });
+      return;
+    }
     // The app starts loading at once; the zoom plays while it does.
     var zoom = startLaunch(it);
     (function () {
@@ -771,7 +795,7 @@
 
   function openMenu() {
     var it = items[focus];
-    if (!it || it.kind === 'add' || it.kind === 'vibe') return;
+    if (!it || it.kind === 'add' || it.kind === 'vibe' || it.kind === 'samsung') return;
     var group = groupOf(it);
     var gi = group.indexOf(it);
     menuItems = [
