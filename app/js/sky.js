@@ -163,7 +163,7 @@
     box.textContent = '';
     if (next === 'rain') makeRain(box, 70, 22, 40, 1);
     else if (next === 'drizzle') makeRain(box, 24, 10, 55, 1.7);
-    else if (next === 'storm') makeRain(box, 110, 28, 40, 0.75);
+    else if (next === 'storm') makeRain(box, 80, 22, 32, 0.75);
     else if (next === 'snow') makeSnow(box);
     root.classList.toggle('wet', next === 'rain' || next === 'drizzle' || next === 'storm');
     flash();

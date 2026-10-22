@@ -15,6 +15,10 @@
   /* Liquid Glass: a light, saturated blur with a bright rim on top and a darker one below */
   --lg-bg: rgba(255, 255, 255, 0.10);
   --lg-blur: blur(36px) saturate(190%) brightness(1.06);
+  /* Static "frosted glass" for the dock tiles — no live backdrop-filter, so the
+     12 always-visible tiles don't re-blur the moving photo every frame (the
+     app icons cover the face anyway; only name/monogram/+/Vibe tiles show it). */
+  --lg-frost: linear-gradient(158deg, rgba(118, 124, 140, 0.52) 0%, rgba(44, 48, 60, 0.66) 100%);
   --lg-rim: inset 0 1.5px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(255, 255, 255, 0.10),
             inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 18px 30px -18px rgba(255, 255, 255, 0.22);
   --text: #fff;
@@ -404,9 +408,7 @@ html.lite #wx-week {
   inset: 0;
   border-radius: inherit;
   overflow: hidden;
-  background: var(--lg-bg);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: var(--lg-frost);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
   display: flex;
   align-items: center;
@@ -492,9 +494,7 @@ html.lite #wx-week {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.48);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.62);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .tile .play::after {
