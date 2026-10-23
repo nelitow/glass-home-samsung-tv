@@ -1,0 +1,11 @@
+# Per-device files — never commit these:
+baseline.json
+*-baseline.json
+*.local.json
+inspect-output.txt
+*-output.txt
+.ghhome-run.sh
+# .NET build output
+ctl/out/
+ctl/obj/
+ctl/bin/

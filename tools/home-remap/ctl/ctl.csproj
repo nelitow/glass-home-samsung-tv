@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>GlassHomeControl</AssemblyName>
+    <!-- The Frame (Tizen 6.5) ships the netcoreapp3.1 runtime; target it so the
+         framework-dependent DLL runs on the TV's /usr/bin/dotnet. -->
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseAppHost>false</UseAppHost>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="Control.cs" /></ItemGroup>
+</Project>

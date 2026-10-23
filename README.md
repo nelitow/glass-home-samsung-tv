@@ -1,23 +1,56 @@
-# Glass Home
+# Glass Home — a home screen for Samsung The Frame
 
-A minimal, Apple TV-style home screen for Samsung Tizen TVs, plus a small
-password-protected website, served by the TV itself, for adding photos and
-shortcuts from your phone.
+A quiet, Apple TV-style home screen for **Samsung The Frame** (and other Tizen
+TVs): full-screen photography that follows the real sky, a frosted-glass dock of
+your apps, the weather, what's playing, and — optionally — the physical **Home
+button remapped to open it instead of Smart Hub**. No ads, no tracking, no
+frameworks. A small password-protected website, served by the TV itself, lets
+you add photos and shortcuts from your phone.
+
+> This is a **The Frame–focused fork** of
+> [victaphu/glass-home-samsung-tv](https://github.com/victaphu/glass-home-samsung-tv),
+> tested on a **2022 Samsung The Frame (`QN50LS03BA` / `QN50LS03BAGXZD`), Tizen
+> 6.5**. It adds a living sky, time-of-day photos, now-playing, album-art
+> colours, seasonal touches, a Vibe mode, a Samsung Home tile, and a toolkit to
+> remap the Home button. Upstream was tested on a 2023 Q70C (Tizen 8); most of
+> this works across recent Tizen TVs, but the Home-button remap is Frame/
+> firmware-specific.
 
 ![Glass Home on the TV](docs/screenshots/home.png)
 
-- Full-screen photos that crossfade every 45 seconds with a slow drift: 12
-  bundled CC0 nature photos mixed with your own, shuffled once a day.
-- A frosted-glass dock of your apps, then your website and YouTube shortcuts,
-  then **+**.
-- Clock and date, and optionally the weather (now plus 7 days, from
-  [Open-Meteo](https://open-meteo.com/), no account or key).
-- A screensaver (only the photos after 3 minutes idle; the first button press
-  just wakes the screen) and dimmed photos in the evening.
-- **+** shows the address and password of the TV's photo website. Open it on
-  your phone to upload photos (resized on the phone, so iPhone HEIC works) and
-  add YouTube or website shortcuts.
-- Plain HTML, CSS and JavaScript. No frameworks, no tracking, no ads.
+## Features
+
+- **Photography that follows the day.** Full-screen photos crossfade every 45s
+  with a slow drift; 22 bundled CC0 photos mixed with your own, shuffled daily.
+  Photos are tagged **dawn / day / golden / night** and shown at the matching
+  time of day.
+- **A living sky over the photos.** Real weather is drawn on top: rain running
+  down the glass, storms with lightning, fog, morning haze, snow, an overcast
+  cast, and a warm wash at dawn and golden hour.
+- **Weather, selectable.** Clock, date, and the weather (now + 7 days) from
+  [Open-Meteo](https://open-meteo.com/) — no account or key. Press **Up** from
+  the dock for a details panel. A **rain alert** banner warns when rain is due
+  within the next two hours.
+- **A frosted-glass dock** of your apps, then your website/YouTube shortcuts,
+  then **Vibe**, **Samsung Home**, and **+**. Apps open with a launch-zoom
+  animation.
+- **Now playing.** When Spotify or another app is playing in the background, the
+  dock shows the track, and the screen quietly takes on the **album art's
+  colours**.
+- **Vibe mode.** A dock tile that fills the screen with warm light drifting over
+  a dark background — a lamp for the room.
+- **Samsung Home tile.** Opens Samsung's Smart Hub when you want it (and your
+  safety net if you remap the Home button).
+- **Seasonal touches.** Festa junina bunting in June, Christmas lights from
+  December to 6 January, fireworks at midnight on New Year.
+- **An app grid.** Press **Down** from the dock for every installed store app,
+  A–Z.
+- **The + phone website.** Shows the TV's address and a password; open it on
+  your phone (same Wi-Fi) to upload photos and add YouTube/website shortcuts.
+- **A screensaver** (photos only, after 3 minutes idle) and evening dimming.
+- **Interface sounds**, synthesised, on every move (optional).
+- **Home button → Glass Home** (optional, advanced): see
+  [Replacing the Home button](#replacing-the-home-button).
 
 ![The + panel (desktop preview; on the TV it shows the TV's own address)](docs/screenshots/add-panel.png)
 
@@ -26,20 +59,22 @@ in [docs/screenshots/on-tv](docs/screenshots/on-tv/).
 
 ## Read this first
 
-- **It does not replace Samsung's Home screen.** No app can. The Home button
-  still opens Smart Hub. What works: pin Glass Home first on the Home row, turn
-  **Start with Smart Hub Home** off and **Autorun Last App** on, and the TV
-  starts in Glass Home. (Autorun Last App reopens the *last* app, so turn the
-  TV off from Glass Home if you want to come back to it.)
+- **You can replace the Home button — carefully.** Out of the box the Home
+  button opens Smart Hub; no app can change that through a public API. This fork
+  includes a toolkit that, on a TV in Developer Mode, points the Home button at
+  Glass Home (see below). It writes undocumented platform settings and is
+  reversible only with a baseline you save first — it's optional and advanced.
+  The simpler route still works too: pin Glass Home first on the Home row, turn
+  **Start with Smart Hub Home** off and **Autorun Last App** on.
 - **You install it yourself** in the TV's Developer Mode, signed with a free
   Samsung developer certificate made for your TV. That needs a computer, about
   an hour the first time, and a free Samsung account. There is no ready-made
   download: a signed package only installs on the TV it was made for.
-- **Tested on one TV:** a 2023 Samsung QLED (Q70C) on Tizen 8. Other models
-  and years should be close but may differ. Reports welcome.
-- **A big OS upgrade can delete it.** Samsung's Tizen OS upgrades (for example
-  to Tizen 9 / One UI Tizen) have removed sideloaded apps on other TVs. You can
-  reinstall it the same way.
+- **Tested on one TV:** a 2022 Samsung **The Frame** (`QN50LS03BA`) on Tizen
+  6.5, from an Apple Silicon Mac. Other models and years should be close but may
+  differ; the Home-button remap is firmware-specific. Reports welcome.
+- **A big OS upgrade can delete it.** Samsung's Tizen OS upgrades have removed
+  sideloaded apps on other TVs. You can reinstall it the same way.
 - **The photo website is plain HTTP** on your home network. It only answers
   devices on your local network and needs the password, but anyone on the same
   Wi-Fi who intercepts traffic could see the password and photos in transit.
@@ -54,7 +89,18 @@ Step by step: **[docs/INSTALL.md](docs/INSTALL.md)**. In short:
 4. Set your options in [`app/js/config.js`](app/js/config.js).
 5. `scripts/build.sh`, then `scripts/install.sh`.
 6. Pin it on the Home row, set it to open at power-on, and turn Developer
-   Mode off again.
+   Mode off again — or remap the Home button (below).
+
+## Replacing the Home button
+
+A toolkit in **[`tools/home-remap/`](tools/home-remap/)** makes the physical
+Home button open Glass Home instead of Smart Hub, on a TV in Developer Mode. It
+writes only the two platform values that decide what Home resolves to, reads
+them back, and keeps an exact-value rollback. It is **advanced and unsupported**,
+reversible only with a baseline you capture first, and was tested on a 2022 The
+Frame (Tizen 6.5) — read [`tools/home-remap/README.md`](tools/home-remap/README.md)
+in full before running anything. The dock's **Samsung Home** tile is the escape
+hatch back to Samsung's menus if anything goes wrong.
 
 ## Settings
 
@@ -63,7 +109,17 @@ All in [`app/js/config.js`](app/js/config.js):
 | Setting | What it does |
 |---|---|
 | `apps` | The dock apps, in order. Each is found by its Tizen app ID, then by name. Remove what you don't have. `icon: false` shows a plain name tile. |
-| `weather` | Off until you set `enabled: true`, `latitude` and `longitude` (`place` is the label shown under the forecast). |
+| `weather` | Off until you set `enabled: true`, `latitude`, `longitude` (`place` is the label). Now + 7 days. |
+| `livingSky` | Weather drawn over the photos (rain, storms, fog, snow, dawn/golden wash). |
+| `timeOfDayPhotos` | Show photos tagged for the current time of day. |
+| `rainAlert` | Banner when rain is due within two hours. |
+| `albumColours` | Tint the screen with the playing track's album-art colours. |
+| `launchAnimation` | Zoom the app icon to fill the screen when opening. |
+| `seasons` | Festa junina (June), Christmas lights (Dec–6 Jan), New Year fireworks. |
+| `vibe` | The warm-light Vibe tile on the dock. |
+| `samsungHome` | The Samsung Home tile (an app id to open, or `false` to drop it). |
+| `sounds` / `soundVolume` | Interface sounds on each move. |
+| `grid` | The app grid (Down from the dock); `include` / `exclude` / `icons`. |
 | `locale` | Date and time format, e.g. `'en-GB'`; empty uses the TV's. |
 | `ambient` | Screensaver delay. |
 | `night` | Evening dimming hours (24-hour, TV clock). |
@@ -79,9 +135,11 @@ Your own logo: `scripts/use-logo.sh path/to/logo.png` (square, ideally 1024 x
 | Remote | What happens |
 |---|---|
 | Left / Right | move along the dock |
-| OK | open the app, website or video |
+| Up | open the weather details panel |
+| Down | open the app grid |
+| OK | open the app, website, video, Vibe, or Samsung Home |
 | Hold OK | Move left, Move right, Remove (shortcuts) or Hide (apps), Cancel |
-| Back | closes the menu or the panel; does nothing on the home screen |
+| Back | closes the menu, panel, grid or Vibe; does nothing on the home screen |
 | OK on **+** | the website address and password; New password; show hidden apps |
 
 **Photos and shortcuts.** On a phone on the same Wi-Fi, open the address shown
@@ -98,7 +156,7 @@ watching?" screen. The switch at the bottom of the **+** panel cycles through
 watch URL, the PAYLOAD form, and both, if yours behaves differently.
 
 **Websites** open in Samsung's own browser (the code follows Samsung's documented
-method, but this wasn't tested on a TV yet).
+method).
 
 ## How it works
 
@@ -115,7 +173,8 @@ method, but this wasn't tested on a TV yet).
 
 - **The app** is what you see. It asks the service for your photos and
   shortcuts and keeps the last answer, so it still works if the service is
-  down.
+  down. It animates only `transform` and `opacity` (the TV's GPU is modest), and
+  a start-up frame probe drops to a lighter mode on slower sets.
 - **The service** is a Tizen web service inside the same package (Node.js;
   the tested TV runs Node 16, the code sticks to the Node 12 API). It serves
   the phone website and keeps everything in the app's private data folder,
@@ -163,14 +222,18 @@ node dev/lint-node12.js    # service code stays within the Node 12 API
 ```
 
 Preview options: `?preview=1`, `?api=…`, `?focus=N`, `?bg=nature-05.jpg`,
-`?panel=1`, `?menu=1`, `?still=1`, `?wx=mock` (sample weather), `?idle=MS`
-(screensaver delay), `?night=1`.
+`?panel=1`, `?menu=1`, `?still=1`, `?grid=1`, `?wx=mock` (sample weather),
+`?wx=panel`, `?vibe=1`, `?fx=rain|drizzle|storm|fog|haze|snow|cloud|clear`,
+`?period=dawn|day|golden|night`, `?season=junina|christmas|newyear`,
+`?np=1` (sample track), `?idle=MS` (screensaver delay), `?night=1`.
 
 The dev tools and image scripts use macOS's `sips`; the app itself has no
 platform dependency.
 
 ## Also in here
 
+- **[`tools/home-remap/`](tools/home-remap/):** remap the physical Home button
+  to Glass Home (advanced; The Frame / Tizen 6.5).
 - **[docs/SAMSUNG-SETTINGS.md](docs/SAMSUNG-SETTINGS.md):** turning off
   Samsung's content recognition, ad ID, promotions and autoplay, a DNS ad
   filter that kept every app working, and how to undo each.
@@ -179,12 +242,15 @@ platform dependency.
   into a camera pointed at the TV (`phonecam.py`; Samsung TVs can't take
   screenshots), and Wake-on-LAN (`wake.py`).
 
-## How this was made
+## Credit
 
-Built in an evening with [Claude Code](https://claude.com/claude-code), which
-did the research, drove the TV over Wi-Fi, checked every step through the
-iPhone camera, and wrote and tested the app. It also watched one cat video.
-[Proof](docs/screenshots/keyboard-cat/).
+A The Frame–focused fork of
+[victaphu/glass-home-samsung-tv](https://github.com/victaphu/glass-home-samsung-tv),
+extended with [Claude Code](https://claude.com/claude-code). The Home-button
+method follows the public work in
+[CleanFrame](https://github.com/nthnclrk/CleanFrame),
+[arn0-tv](https://github.com/NelsonEU/arn0-tv) and
+[couchroot](https://github.com/splitcipher/couchroot).
 
 ## Licence
 
