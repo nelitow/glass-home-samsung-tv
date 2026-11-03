@@ -1,6 +1,6 @@
 #!/bin/sh
 # Downloads each dock app's official icon from its App Store listing into
-# app/img/apps/<key>.png (512 x 512). Pairs are <key>:<App Store id>; the key
+# app/img/apps/<key>.png (256 x 256; the tiles are 156-184 px). Pairs are <key>:<App Store id>; the key
 # matches `key` in app/js/config.js (or a `grid.icons` entry there), which
 # points the icon at the file.
 set -eu
@@ -14,6 +14,6 @@ for pair in youtube:544007664 netflix:363590051 prime:545519333 disney:144607592
   art=$(curl -fsS "https://itunes.apple.com/lookup?id=$id&country=br" |
         node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s).results[0];process.stdout.write(r?r.artworkUrl512:"")})')
   [ -n "$art" ] || { echo "no listing for $key ($id)" >&2; continue; }
-  curl -fsS -o "app/img/apps/$key.png" "$(echo "$art" | sed 's/512x512bb\.jpg$/512x512bb.png/')"
+  curl -fsS -o "app/img/apps/$key.png" "$(echo "$art" | sed 's/512x512bb\.jpg$/256x256bb.png/')"
   echo "$key"
 done

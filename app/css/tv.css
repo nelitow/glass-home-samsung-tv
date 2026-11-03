@@ -1,6 +1,9 @@
 /*
  * Glass Home - dark glass home screen, 1920 x 1080.
  * Only transform and opacity are animated (cheap on the TV's GPU).
+ * No live backdrop-filter anywhere: the Ken Burns photo moves every frame, so
+ * any blurred glass over it re-blurs the whole area every frame, forever. The
+ * glass is faked with static, more opaque fills instead.
  */
 :root {
   --tile: 156px;
@@ -12,9 +15,8 @@
   --glass: rgba(28, 28, 30, 0.42);
   --glass-strong: rgba(28, 28, 30, 0.62);
   --glass-border: rgba(255, 255, 255, 0.10);
-  /* Liquid Glass: a light, saturated blur with a bright rim on top and a darker one below */
-  --lg-bg: rgba(255, 255, 255, 0.10);
-  --lg-blur: blur(36px) saturate(190%) brightness(1.06);
+  /* Liquid Glass look: a tint over a dark static fill, bright rim on top and a darker one below */
+  --lg-bg: rgba(255, 255, 255, 0.06);
   /* Static "frosted glass" for the dock tiles — no live backdrop-filter, so the
      12 always-visible tiles don't re-blur the moving photo every frame (the
      app icons cover the face anyway; only name/monogram/+ tiles show it). */
@@ -56,26 +58,28 @@ html, body {
 /* ---------- background photos ---------- */
 #bg, .bg-layer {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
 }
 #bg { z-index: 0; }   /* own stacking context: the layers' z-index stays inside */
 .bg-layer {
   opacity: 0;
   transition: opacity 1.6s ease-in-out;
-  will-change: opacity;
   overflow: hidden;
 }
 .bg-layer.show { opacity: 1; }
 .bg-layer.instant { transition: none; }
 .bg-layer img {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   transform-origin: 50% 50%;
-  will-change: transform;
 }
+/* The photo is a canvas (see js/backdrop.js), so it is its own GPU layer and
+   text changes above it never repaint it. */
+.bg-layer canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform-origin: 50% 50%; }
+html.drift .bg-layer img, html.drift .bg-layer canvas { will-change: transform; }
 
 /* soft dark gradients so white text reads over any photo */
 #shade-bottom {
@@ -144,8 +148,8 @@ html, body {
   width: 1920px;
   height: 1080px;
   transition: transform 0.55s var(--ease);
-  will-change: transform;
 }
+html.in-grid #ui { will-change: transform; }
 
 #shelf {
   position: absolute;
@@ -160,13 +164,13 @@ html, body {
   color: var(--text-2);
   letter-spacing: 0.005em;
 }
+/* own layers so their text changes don't repaint the full-screen page layer */
+#clock, #shelf-title, #shelf-sub { will-change: transform; }
 #shelf-title, #shelf-sub {
   opacity: 0;
-  transform: translate3d(0, 10px, 0);
-  transition: opacity 0.35s ease, transform 0.45s var(--ease);
+  transition: opacity 0.25s ease;
 }
-#shelf.on #shelf-title, #shelf.on #shelf-sub { opacity: 1; transform: none; }
-#shelf-sub { transition-delay: 0.05s; }
+#shelf.on #shelf-title, #shelf.on #shelf-sub { opacity: 1; }
 #shelf-title {
   margin-top: 14px;
   font-size: 92px;
@@ -195,8 +199,10 @@ html, body {
 }
 .wash {
   opacity: 0;
-  transition: opacity 0.9s ease;
+  transition: opacity 0.6s ease;
+  will-change: opacity;           /* fades on the GPU, without repainting what's under it */
 }
+.wash canvas { display: block; width: 100%; height: 100%; }
 .wash.show { opacity: 0.42; }
 
 /* ---------- weather (under the clock) ---------- */
@@ -237,9 +243,7 @@ html, body {
   margin-top: 20px;
   padding: 16px 14px 10px;
   border-radius: 28px;
-  background: var(--lg-bg);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: linear-gradient(var(--lg-bg), var(--lg-bg)), rgba(28, 28, 30, 0.58);
   box-shadow: var(--lg-rim);
   text-shadow: none;
 }
@@ -293,13 +297,19 @@ html, body {
 /* ---------- evening dimming ---------- */
 #night-shade {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, 0.38);
   opacity: 0;
-  transition: opacity 3s ease;
+  transition: opacity 3s ease, visibility 0s linear 3s;
   pointer-events: none;
 }
-html.night #night-shade { opacity: 1; }
+html.night #night-shade { opacity: 1; transition: opacity 3s ease, visibility 0s; }
+/* Full-screen overlays that are off are also hidden, not just transparent:
+   a transparent box over the moving photo still gets a compositor layer (and
+   is blended every frame); a hidden one is skipped. The visibility switch is
+   delayed until the fade-out ends. */
+#night-shade, #grid-shade, #scrim, #art-glow { visibility: hidden; }
+html.night #night-shade, html.in-grid #grid-shade, #scrim.open, html.art-on #art-glow { visibility: visible; }
 
 /* ---------- screensaver: only the photos ---------- */
 #shelf, #shelf-wash, #clock, #shade-top, #shade-left, #shade-bottom { transition: opacity 0.3s ease; }
@@ -319,12 +329,6 @@ html.ambient #shade-bottom {
   transition: opacity 1.2s ease;
 }
 
-html.lite #wx-week {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: rgba(28, 28, 30, 0.58);
-}
-
 /* ---------- photo credit ---------- */
 #credit {
   position: absolute;
@@ -342,6 +346,20 @@ html.lite #wx-week {
   transition: opacity 0.8s ease;
 }
 #credit.on { opacity: 0.6; }
+/* paintings: the title line, then a short note about the work. Wide, so it
+   stays on one line below the focused tile's name (two at most). */
+#credit.art { bottom: 24px; max-width: 1560px; white-space: normal; }
+#credit.art.on { opacity: 0.85; }
+#credit.art .credit-line { font-size: 19px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.credit-about {
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--text-2);
+  max-height: 2.7em;             /* two lines */
+  overflow: hidden;
+}
 
 /* ---------- dock ---------- */
 #dock {
@@ -360,19 +378,9 @@ html.lite #wx-week {
   height: calc(100% + 100px);
   z-index: 1;
 }
+/* Plain clip while the row scrolls; no mask-image edge fades (those cost an
+   offscreen pass on every frame the row or a tile moves). */
 #dock.scrolling #dock-viewport { overflow: hidden; }
-#dock.scrolling.fade-left #dock-viewport {
-  -webkit-mask-image: linear-gradient(to right, transparent 0, transparent 16px, #000 110px, #000 100%);
-  mask-image: linear-gradient(to right, transparent 0, transparent 16px, #000 110px, #000 100%);
-}
-#dock.scrolling.fade-right #dock-viewport {
-  -webkit-mask-image: linear-gradient(to left, transparent 0, transparent 16px, #000 110px, #000 100%);
-  mask-image: linear-gradient(to left, transparent 0, transparent 16px, #000 110px, #000 100%);
-}
-#dock.scrolling.fade-left.fade-right #dock-viewport {
-  -webkit-mask-image: linear-gradient(to right, transparent 0, transparent 16px, #000 110px, #000 calc(100% - 110px), transparent calc(100% - 16px), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, transparent 16px, #000 110px, #000 calc(100% - 110px), transparent calc(100% - 16px), transparent 100%);
-}
 #dock-row {
   position: absolute;
   left: 16px;
@@ -397,7 +405,7 @@ html.lite #wx-week {
 }
 .tile .glow {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   border-radius: inherit;
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.55), 0 0 0 1.5px rgba(255, 255, 255, 0.45);
   opacity: 0;
@@ -405,7 +413,7 @@ html.lite #wx-week {
 }
 .tile .face {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   border-radius: inherit;
   overflow: hidden;
   background: var(--lg-frost);
@@ -413,7 +421,6 @@ html.lite #wx-week {
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: translateZ(0);
 }
 .tile.focused {
   transform: translateY(-14px) scale(1.18);
@@ -421,12 +428,12 @@ html.lite #wx-week {
 }
 .tile .spec {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   border-radius: inherit;
   box-shadow: var(--lg-rim);
   pointer-events: none;
 }
-.tile .spec::before {
+.tile.focused .spec::before {
   content: "";
   position: absolute;
   left: -50%;
@@ -434,11 +441,8 @@ html.lite #wx-week {
   width: 200%;
   height: 200%;
   background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  transform: translate3d(-8%, -24%, 0);
 }
-/* a still highlight on the focused tile (no per-move animation, for speed) */
-.tile.focused .spec::before { opacity: 1; transform: translate3d(-8%, -24%, 0); }
 .tile.focused .glow { opacity: 1; }
 
 .tile .app-icon,
@@ -519,13 +523,13 @@ html.lite #wx-week {
 /* ---------- app grid (under the dock) ---------- */
 #grid-shade {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, 0.55);
   opacity: 0;
-  transition: opacity 0.5s ease;
+  transition: opacity 0.5s ease, visibility 0s linear 0.5s;
   pointer-events: none;
 }
-html.in-grid #grid-shade { opacity: 1; }
+html.in-grid #grid-shade { opacity: 1; transition: opacity 0.5s ease, visibility 0s; }
 
 html.in-grid #dock, html.in-grid #credit { opacity: 0; }
 #grid { position: absolute; }
@@ -558,15 +562,14 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
   gap: 16px;
   padding: 10px 22px 10px 10px;
   border-radius: 26px;
-  background: rgba(40, 40, 44, 0.38);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(40, 40, 44, 0.74);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3), var(--lg-rim);
   opacity: 0;
+  visibility: hidden;
   transform: translate3d(0, -10px, 0);
-  transition: opacity 0.4s ease, transform 0.45s var(--ease);
+  transition: opacity 0.4s ease, transform 0.45s var(--ease), visibility 0s linear 0.45s;
 }
-#np.on { opacity: 1; transform: none; }
+#np.on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.4s ease, transform 0.45s var(--ease), visibility 0s; }
 #np-art {
   flex: none;
   width: 56px;
@@ -620,7 +623,7 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
 @keyframes np-pulse { from { opacity: 0.75; } to { opacity: 1; } }
 
 /* ---------- weather: selectable card and details panel ---------- */
-#wx-week { transition: transform 0.28s var(--ease), box-shadow 0.28s ease; }
+#wx-week { transition: transform 0.28s var(--ease); }
 #weather.focused #wx-week {
   transform: scale(1.05);
   box-shadow: var(--lg-rim), 0 0 0 2px rgba(255, 255, 255, 0.55), 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -632,9 +635,7 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
   width: 1500px;
   padding: 48px 60px 32px;
   border-radius: 48px;
-  background: rgba(40, 40, 44, 0.48);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(34, 34, 38, 0.88);
   box-shadow: 0 40px 120px rgba(0, 0, 0, 0.5), var(--lg-rim);
   opacity: 0;
   visibility: hidden;
@@ -715,7 +716,7 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
 /* glyph + number stacked and centred as one group, same footprint as an app icon */
 .tile .input-stack {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -741,8 +742,10 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
   box-shadow: 0 0 10px rgba(55, 214, 122, 0.8);
 }
 /* ---------- living sky (js/sky.js): weather and time of day over the photos ---------- */
-#sky, #sky > div, .sky-drops, .sky-rain { position: absolute; inset: 0; pointer-events: none; }
-#sky { overflow: hidden; }
+#sky, #sky > div, .sky-drops, .sky-rain { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+/* No overflow:hidden here (body already clips): a clipping container stops
+   Chrome squashing the sky into one layer above the photo, which cost the
+   GPU ~2.5 extra full screens per frame. */
 .sky-tint { opacity: 0; transition: opacity 6s ease; }
 .t-golden { background: linear-gradient(180deg, rgba(255, 150, 70, 0.34) 0%, rgba(255, 120, 60, 0.14) 45%, rgba(150, 50, 90, 0.22) 100%); }
 .t-dawn { background: linear-gradient(180deg, rgba(255, 170, 195, 0.28) 0%, rgba(255, 205, 165, 0.12) 50%, rgba(120, 140, 210, 0.14) 100%); }
@@ -762,6 +765,9 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
   animation: haze 70s ease-in-out infinite alternate;
 }
 .haze-b { bottom: 25%; height: 60%; opacity: 0.7; animation-duration: 95s; animation-direction: alternate-reverse; }
+/* Not built while clear: even at opacity 0 the endless drift keeps two
+   3840px compositor layers and forces everything above them into layers too. */
+#sky:not(.haze):not(.fog) .sky-haze { display: none; }
 @keyframes haze { from { transform: translate3d(-8%, 0, 0); } to { transform: translate3d(8%, 0, 0); } }
 .sky-rain { left: -10%; right: -10%; transform: rotate(8deg); }
 .streak {
@@ -818,37 +824,36 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
   gap: 18px;
   padding: 14px 28px 14px 18px;
   border-radius: 28px;
-  background: rgba(30, 60, 90, 0.42);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(30, 60, 90, 0.78);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35), var(--lg-rim);
   opacity: 0;
+  visibility: hidden;
   transform: translate3d(0, -14px, 0) scale(0.97);
-  transition: opacity 0.5s ease, transform 0.6s var(--ease);
+  transition: opacity 0.5s ease, transform 0.6s var(--ease), visibility 0s linear 0.6s;
 }
-#rain-alert.on { opacity: 1; transform: none; }
+#rain-alert.on { opacity: 1; visibility: visible; transform: none; transition: opacity 0.5s ease, transform 0.6s var(--ease), visibility 0s; }
 .ra-icon { width: 58px; height: 58px; flex: none; }
 .ra-title { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
 .ra-sub { margin-top: 4px; font-size: 20px; color: var(--text-2); }
 html.in-grid #rain-alert { opacity: 0; }
 
 /* ---------- album colours ---------- */
-#art-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 2.5s ease; }
-html.art-on #art-glow { opacity: 1; }
+#art-glow { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; opacity: 0; transition: opacity 2.5s ease, visibility 0s linear 2.5s; }
+html.art-on #art-glow { opacity: 1; transition: opacity 2.5s ease, visibility 0s; }
 .art-pulse {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: radial-gradient(ellipse 55% 70% at 100% 0%, rgba(var(--art2), 0.5), rgba(var(--art2), 0) 70%),
               radial-gradient(ellipse 65% 60% at 0% 100%, rgba(var(--art1), 0.5), rgba(var(--art1), 0) 70%);
-  animation: artPulse 5s ease-in-out infinite alternate;
 }
+html.art-on .art-pulse { animation: artPulse 5s ease-in-out infinite alternate; }
 @keyframes artPulse { from { opacity: 0.65; } to { opacity: 1; } }
 html.art-on { --lg-bg: rgba(var(--art1), 0.2); }
-html.art-on #np { background: linear-gradient(120deg, rgba(var(--art1), 0.62), rgba(var(--art2), 0.45)); }
+html.art-on #np { background: linear-gradient(120deg, rgba(var(--art1), 0.82), rgba(var(--art2), 0.70)); }
 html.art-on #np-state i { background: #fff; }
 
 /* ---------- launch zoom ---------- */
-#launch { position: absolute; inset: 0; z-index: 10; visibility: hidden; pointer-events: none; }
+#launch { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 10; visibility: hidden; pointer-events: none; }
 #launch.on { visibility: visible; }
 .launch-card {
   position: absolute;
@@ -860,7 +865,8 @@ html.art-on #np-state i { background: #fff; }
 .launch-name { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 22px; font-weight: 600; }
 
 /* ---------- seasons (js/seasons.js) ---------- */
-#season { position: absolute; inset: 0; pointer-events: none; }
+#season { position: absolute; top: 0; right: 0; bottom: 0; left: 0; pointer-events: none; }
+#season:empty { display: none; }
 .season-wire { position: absolute; left: 0; top: 0; }
 .flag { position: absolute; width: 30px; height: 40px; transform-origin: 50% 0; }
 .cloth {
@@ -930,9 +936,7 @@ html.art-on #np-state i { background: #fff; }
   min-width: 340px;
   padding: 12px;
   border-radius: 30px;
-  background: rgba(40, 40, 44, 0.38);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(40, 40, 44, 0.88);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), var(--lg-rim);
   transform-origin: 50% 100%;
   opacity: 0;
@@ -970,14 +974,14 @@ html.art-on #np-state i { background: #fff; }
 /* ---------- + panel ---------- */
 #scrim {
   position: absolute;
-  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, 0.40);
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
   pointer-events: none;
   z-index: 6;
 }
-#scrim.open { opacity: 1; }
+#scrim.open { opacity: 1; transition: opacity 0.3s ease, visibility 0s; }
 #panel {
   position: absolute;
   left: 50%;
@@ -985,9 +989,7 @@ html.art-on #np-state i { background: #fff; }
   width: 1040px;
   padding: 58px 68px 40px;
   border-radius: 48px;
-  background: rgba(40, 40, 44, 0.44);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(34, 34, 38, 0.88);
   box-shadow: 0 40px 120px rgba(0, 0, 0, 0.5), var(--lg-rim);
   opacity: 0;
   visibility: hidden;
@@ -1115,9 +1117,7 @@ html.art-on #np-state i { background: #fff; }
   max-width: 1200px;
   padding: 18px 34px;
   border-radius: 28px;
-  background: rgba(40, 40, 44, 0.38);
-  -webkit-backdrop-filter: var(--lg-blur);
-  backdrop-filter: var(--lg-blur);
+  background: rgba(40, 40, 44, 0.84);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), var(--lg-rim);
   font-size: 26px;
   font-weight: 500;
@@ -1125,18 +1125,14 @@ html.art-on #np-state i { background: #fff; }
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0;
+  visibility: hidden;
   transform: translate(-50%, -24px);
-  transition: opacity 0.25s ease, transform 0.3s var(--ease);
+  transition: opacity 0.25s ease, transform 0.3s var(--ease), visibility 0s linear 0.3s;
   z-index: 9;
 }
-#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#toast.on { opacity: 1; visibility: visible; transform: translate(-50%, 0); transition: opacity 0.25s ease, transform 0.3s var(--ease), visibility 0s; }
 
 /* ---------- states ---------- */
 html.paused *, html.paused *::before, html.paused *::after { animation-play-state: paused !important; }
 html.still *, html.still *::before, html.still *::after { transition: none !important; animation: none !important; }
 html.lite .bg-layer img { will-change: auto; }
-html.lite .tile .face {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  background: rgba(60, 60, 66, 0.72);
-}

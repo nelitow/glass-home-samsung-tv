@@ -45,41 +45,49 @@
   }
   P.matchByName = matchByName;
 
+  // One async getAppsInfo() shared by the dock and the grid (they ask together
+  // on every return to the home screen). null when it fails or times out.
+  var infoPending = null;
+  function appsInfo() {
+    if (infoPending) return infoPending;
+    infoPending = new Promise(function (resolve) {
+      var timer = setTimeout(function () { resolve(null); }, 4000);
+      try {
+        tz.application.getAppsInfo(function (list) { clearTimeout(timer); resolve(list || []); },
+          function () { clearTimeout(timer); resolve(null); });
+      } catch (e) { clearTimeout(timer); resolve(null); }
+    });
+    infoPending.then(function () { setTimeout(function () { infoPending = null; }, 1500); });
+    return infoPending;
+  }
+
   // Resolves { key: { id, name, iconPath } } for the dock apps that are installed.
+  // Matched by id from the async app list. The synchronous getAppInfo() is
+  // only a fallback: on this TV each call blocks the page for 17-50 ms, about
+  // 280 ms for the whole dock, right as the viewer comes back and presses keys.
   P.resolveApps = function (defs) {
     if (!tz) {
       var mock = (window.GH_MOCK && window.GH_MOCK.apps) || [];
       return Promise.resolve(matchByName(defs, mock, {}));
     }
-    var result = {};
-    defs.forEach(function (def) {
-      for (var i = 0; i < def.ids.length; i++) {
-        try {
-          var info = tz.application.getAppInfo(def.ids[i]);
+    function byIds(lookup) {
+      var result = {};
+      defs.forEach(function (def) {
+        for (var i = 0; i < def.ids.length; i++) {
+          var info = lookup(def.ids[i]);
           if (info && info.id) { result[def.key] = { id: info.id, name: info.name, iconPath: info.iconPath || null }; break; }
-        } catch (e) { /* NotFoundError: try the next id */ }
-      }
-    });
-    return new Promise(function (resolve) {
-      var done = false;
-      var timer = setTimeout(function () { if (!done) { done = true; resolve(result); } }, 4000);
-      try {
-        tz.application.getAppsInfo(function (list) {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          resolve(matchByName(defs, list, result));
-        }, function () {
-          if (done) return;
-          done = true;
-          clearTimeout(timer);
-          resolve(result);
-        });
-      } catch (e) {
-        done = true;
-        clearTimeout(timer);
-        resolve(result);
-      }
+        }
+      });
+      return result;
+    }
+    function sync(id) {
+      try { return tz.application.getAppInfo(id); } catch (e) { return null; }   // NotFoundError
+    }
+    return appsInfo().then(function (list) {
+      if (!list) return byIds(sync);
+      var map = {};
+      list.forEach(function (a) { if (a && a.id) map[a.id] = a; });
+      return matchByName(defs, list, byIds(function (id) { return map[id]; }));
     });
   };
 
@@ -90,13 +98,7 @@
         .map(function (a) { return { id: a.id, name: a.name, iconPath: a.iconPath || null }; });
     };
     if (!tz) return Promise.resolve(keep(window.GH_MOCK && window.GH_MOCK.apps));
-    return new Promise(function (resolve) {
-      var timer = setTimeout(function () { resolve([]); }, 4000);
-      try {
-        tz.application.getAppsInfo(function (list) { clearTimeout(timer); resolve(keep(list)); },
-          function () { clearTimeout(timer); resolve([]); });
-      } catch (e) { clearTimeout(timer); resolve([]); }
-    });
+    return appsInfo().then(keep);
   };
 
   P.iconUrl = function (iconPath) {

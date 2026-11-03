@@ -39,6 +39,9 @@
   }
 
   window.GH.Sounds = {
+    // Making the audio context takes 50-120 ms on the TV; do it while idle
+    // rather than on the first key press.
+    warm: function () { audio(); },
     move: function () { tone(1650, 0.045, 0.22, 1400); },
     select: function () { tone(880, 0.09, 0.30, 1320); },
     bump: function () { tone(220, 0.07, 0.30, 160); },

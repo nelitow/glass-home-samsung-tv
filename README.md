@@ -20,10 +20,11 @@ you add photos and shortcuts from your phone.
 
 ## Features
 
-- **Photography that follows the day.** Full-screen photos crossfade every 45s
-  with a slow drift; 22 bundled CC0 photos mixed with your own, shuffled daily.
-  Photos are tagged **dawn / day / golden / night** and shown at the matching
-  time of day.
+- **Photography and paintings that follow the day.** Full-screen pictures crossfade every 5 minutes
+  (an optional slow drift, `photoDrift`): 22 bundled CC0 photos and 22 public-domain landscape
+  paintings (Van Gogh, Monet, Turner, Hokusai, Friedrich, Church, Bierstadt…) mixed with your own,
+  shuffled daily. Paintings show their title, year, artist and a short note about the work.
+  Everything is tagged **dawn / day / golden / night** and shown at the matching time of day.
 - **A living sky over the photos.** Real weather is drawn on top: rain running
   down the glass, storms with lightning, fog, morning haze, snow, an overcast
   cast, and a warm wash at dawn and golden hour.
@@ -114,6 +115,7 @@ All in [`app/js/config.js`](app/js/config.js):
 | `timeOfDayPhotos` | Show photos tagged for the current time of day. |
 | `rainAlert` | Banner when rain is due within two hours. |
 | `albumColours` | Tint the screen with the playing track's album-art colours. |
+| `photoDrift` | Slow zoom on each photo. Off by default: it makes the TV redraw the whole screen every frame. |
 | `launchAnimation` | Zoom the app icon to fill the screen when opening. |
 | `seasons` | Festa junina (June), Christmas lights (Dec–6 Jan), New Year fireworks. |
 | `vibe` | The warm-light Vibe tile on the dock. |
@@ -124,7 +126,7 @@ All in [`app/js/config.js`](app/js/config.js):
 | `ambient` | Screensaver delay. |
 | `night` | Evening dimming hours (24-hour, TV clock). |
 | `youtubeMode` | How YouTube shortcuts are opened (see below). |
-| `photoIntervalMs` | How often the photo changes. |
+| `photoIntervalMs` | How often the photo changes (5 minutes). |
 
 Your own logo: `scripts/use-logo.sh path/to/logo.png` (square, ideally 1024 x
 1024) makes the TV icon and the website icons. The on-screen name is in

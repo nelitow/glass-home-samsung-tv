@@ -9,6 +9,10 @@
   var cfg = GH.config;
   var tz = !cfg.preview && typeof window.tizen !== 'undefined' ? window.tizen : null;
   var client = null;
+  // A read costs 30-50 ms of main thread on the TV, so skip it while the
+  // remote is in use and catch up once keys stop.
+  var lastKeyAt = 0;
+  window.addEventListener('keydown', function () { lastKeyAt = Date.now(); }, true);
 
   function read() {
     if (!tz) {
@@ -42,14 +46,15 @@
     this.info = null;
     this.timer = null;
   }
-  NowPlaying.prototype.poll = function () {
+  NowPlaying.prototype.poll = function (force) {
+    if (!force && Date.now() - lastKeyAt < 2000) return;
     var info = read();
     if (!same(info, this.info)) { this.info = info; this.onChange(info); }
   };
   NowPlaying.prototype.start = function () {
     var self = this;
     this.stop();
-    this.poll();
+    this.poll(true);
     this.timer = setInterval(function () { self.poll(); }, cfg.nowPlayingEveryMs);
   };
   NowPlaying.prototype.stop = function () { clearInterval(this.timer); this.timer = null; };

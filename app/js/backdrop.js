@@ -9,6 +9,11 @@
  * limits the rotation to photos that suit the moment (the time of day); when
  * none do, all are used.
  * Only transform and opacity are animated.
+ *
+ * Each photo is drawn into a canvas rather than shown as an <img>. On the TV
+ * (Chrome 85, software raster) a full-screen <img> layer takes ~0.8 s to
+ * rasterise, and the main thread - so the remote - is blocked until it is
+ * done, once per photo. A canvas is a GPU texture: drawImage takes ~1-10 ms.
  */
 (function () {
   'use strict';
@@ -48,6 +53,21 @@
       else img.onload = ok;
       setTimeout(bad, 20000);
     });
+  }
+
+  // Paint a decoded photo into a screen-sized canvas, cropped like object-fit: cover.
+  function toCanvas(img) {
+    var W = window.innerWidth || 1920, H = window.innerHeight || 1080;
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var c = document.createElement('canvas');
+    var ctx = iw && ih && c.getContext && c.getContext('2d');
+    if (!ctx) return img;
+    c.width = W;
+    c.height = H;
+    var k = Math.max(W / iw, H / ih);
+    var sw = W / k, sh = H / k;
+    ctx.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, W, H);
+    return c;
   }
 
   function Backdrop(layerA, layerB, opts) {
@@ -156,7 +176,11 @@
     var self = this;
     clearTimeout(this.timer);
     this.dueAt = Date.now() + ms;
-    this.timer = setTimeout(function () { self.timer = null; self.advance(); }, ms);
+    this.timer = setTimeout(function () {
+      self.timer = null;
+      if (self.held) { self._schedule(1500); return; }    // not while the viewer is navigating
+      self.advance();
+    }, ms);
   };
 
   Backdrop.prototype.advance = function (forced, instant, attempt) {
@@ -191,7 +215,24 @@
       { transform: 'scale(1) translate3d(0, 0, 0)' },
       { transform: 'scale(' + scale + ') translate3d(' + dx + '%, ' + dy + '%, 0)' }
     ], { duration: duration, easing: 'linear', fill: 'forwards' });
-    if (this.paused) this.anims[layerIndex].pause();
+    if (this.paused || this.held) this.anims[layerIndex].pause();
+  };
+
+  // Freeze the drift for a moment (while the viewer navigates). A moving photo
+  // makes the TV recomposite the whole screen every frame, which starves the
+  // focus animations; held still, only the tiles that move are redrawn.
+  Backdrop.prototype.hold = function (ms) {
+    var self = this;
+    clearTimeout(this.holdTimer);
+    if (!this.held) {
+      this.held = true;
+      this.anims.forEach(function (a) { if (a) { try { a.pause(); } catch (e) { /* ignore */ } } });
+    }
+    this.holdTimer = setTimeout(function () {
+      self.held = false;
+      if (self.paused) return;
+      self.anims.forEach(function (a) { if (a) { try { a.play(); } catch (e) { /* ignore */ } } });
+    }, ms || 2500);
   };
 
   Backdrop.prototype._show = function (it, img, instant) {
@@ -200,6 +241,7 @@
     var layer = this.layers[back];
     var old = this.front >= 0 ? this.layers[this.front] : null;
     layer.textContent = '';
+    img = toCanvas(img);
     layer.appendChild(img);
     this._kenBurns(back, img, it.key);
     layer.style.zIndex = '2';
@@ -241,7 +283,7 @@
   Backdrop.prototype.resume = function () {
     if (!this.paused) return;
     this.paused = false;
-    this.anims.forEach(function (a) { if (a) { try { a.play(); } catch (e) { /* ignore */ } } });
+    if (!this.held) this.anims.forEach(function (a) { if (a) { try { a.play(); } catch (e) { /* ignore */ } } });
     if (this.pendingImg) {
       var p = this.pendingImg;
       this.pendingImg = null;

@@ -30,8 +30,12 @@
     serviceName: 'Photos',
     serviceBase: q.api || (preview ? 'http://127.0.0.1:18090' : 'http://127.0.0.1:8090'),
 
-    photoIntervalMs: 45000,
+    photoIntervalMs: 5 * 60 * 1000,
     fadeMs: 1600,
+    // Slow zoom on each photo (Ken Burns). Off by default: a moving photo
+    // makes this TV's GPU redraw the whole screen every frame. Photos still
+    // crossfade every photoIntervalMs.
+    photoDrift: false,
     kenBurnsScale: 1.06,
     clockEveryMs: 15000,
     pollEveryMs: 20000,
@@ -140,7 +144,9 @@
       { key: 'spotify', tint: '#1db954', label: 'Spotify', ids: ['rJeHak5zRg.Spotify'],
         names: ['^spotify\\b'], icon: 'img/apps/spotify.png' },
       { key: 'browser', tint: '#3d8bfd', label: 'Internet', ids: ['org.tizen.browser'],
-        names: ['^internet$', '^browser$'] }
+        names: ['^internet$', '^browser$'] },
+      { key: 'store', tint: '#3d6bff', label: 'Apps', ids: ['com.samsung.tv.store', 'org.volt.apps'],
+        names: [], icon: 'img/apps/store.svg' }
     ]
   };
 }());

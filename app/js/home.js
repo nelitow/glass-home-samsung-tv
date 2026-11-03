@@ -434,15 +434,27 @@
     }
     row.style.transform = 'translate3d(' + (-offset) + 'px, 0, 0)';
     dock.classList.toggle('scrolling', scrolling);
-    dock.classList.toggle('fade-left', scrolling && offset > 1);
-    dock.classList.toggle('fade-right', scrolling && offset < rowW - viewW - 1);
     var dockW = viewW + 2 * PADX;
     var cx = (1920 - dockW) / 2 + PADX + x - offset + TILE / 2;
-    // centred under the tile, but never off the screen (long video titles)
-    var lw = label.offsetWidth || 0;
-    var left = clamp(cx - lw / 2, 72, 1920 - 72 - lw);
-    label.style.transform = 'translate3d(' + Math.round(left) + 'px, 0, 0)';
+    placeLabel(cx);
     return cx;
+  }
+
+  // Centred under the tile, but never off the screen (long video titles).
+  // Measured on the next frame, so a key press never forces a layout of its own.
+  var labelCx = 0;
+  var labelText = '';
+  var labelRaf = null;
+  function placeLabel(cx) {
+    labelCx = cx;
+    if (labelRaf) return;
+    labelRaf = requestAnimationFrame(function () {
+      labelRaf = null;
+      if (label.textContent !== labelText) label.textContent = labelText;
+      var lw = label.offsetWidth || 0;
+      var left = clamp(labelCx - lw / 2, 72, 1920 - 72 - lw);
+      label.style.transform = 'translate3d(' + Math.round(left) + 'px, 0, 0)';
+    });
   }
 
   // ---------- top shelf: the focused tile's name, over a wash of its colour ----------
@@ -452,7 +464,39 @@
   var shelfSub = $('shelf-sub');
   var shelfKey = null;
   var shelfTimer = null;
-  var shelfRaf = null;
+
+  // The wash is a small canvas the GPU stretches to 1920x760. As a CSS
+  // gradient, each new colour re-rasterised a full-screen layer on the TV
+  // (~0.9 s), freezing the title fade and the tiles every time focus settled.
+  var WASH_W = 320, WASH_H = 127;
+  function paintWash(el, tint) {
+    var c = el.firstChild;
+    if (!c) {
+      c = document.createElement('canvas');
+      c.width = WASH_W;
+      c.height = WASH_H;
+      el.appendChild(c);
+    }
+    var ctx = c.getContext('2d');
+    if (!ctx) return;
+    // radial-gradient(ellipse 75% 95% at 18% 0%, tint 0%, transparent 70%)
+    var cx = WASH_W * 0.18, rx = WASH_W * 0.75, ry = WASH_H * 0.95;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, WASH_W, WASH_H);
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, 0, WASH_W, WASH_H);
+    ctx.globalCompositeOperation = 'destination-in';     // fade the tint out, no grey fringe
+    ctx.save();
+    ctx.translate(cx, 0);
+    ctx.scale(rx, ry);
+    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.7, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-cx / rx, 0, WASH_W / rx, WASH_H / ry);
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+  }
 
   function playingIn(it) {
     return nowInfo && it && it.kind === 'app' && it.id === nowInfo.appId ? nowInfo : null;
@@ -474,24 +518,20 @@
     shelfKey = it.key;
     $('shelf').classList.remove('on');
     clearTimeout(shelfTimer);
-    if (shelfRaf) cancelAnimationFrame(shelfRaf);
-    // The colour wash is a big gradient repaint; do it on the next frame so the
-    // tile movement in this frame stays instant. The text follows a touch later.
-    shelfRaf = requestAnimationFrame(function () {
-      shelfRaf = null;
+    // The colour wash and the big title are repaints; wait until focus settles
+    // so moving along the row (or holding an arrow) only moves the tiles.
+    shelfTimer = setTimeout(function () {
       var next = washA.classList.contains('show') ? washB : washA;
       var prev = next === washA ? washB : washA;
       var np = playingIn(it);
       var tint = artTint && np && np.state === 'PLAY' ? artTint : it.tint;
-      if (tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + tint + ' 0%, transparent 70%)';
+      if (tint) paintWash(next, tint);
       next.classList.toggle('show', !!tint);
       prev.classList.remove('show');
-    });
-    shelfTimer = setTimeout(function () {
       shelfTitle.textContent = it.label;
       shelfSub.textContent = shelfSubFor(it);
       $('shelf').classList.add('on');
-    }, 140);
+    }, 300);
   }
 
   function setFocus(i, quiet) {
@@ -502,15 +542,22 @@
       var t = tileEls[it.key];
       if (t) t.el.classList.toggle('focused', idx === focus);
     });
-    var text = items[focus].label;
-    if (label.textContent !== text) label.textContent = text;
+    labelText = items[focus].label;
     if (mode === 'dock') label.classList.add('on');
     renderShelf(items[focus]);
     layoutDock();
     if (!quiet) {
       focusKey = items[focus].key;
-      ls.set('gh.focus', focusKey);
+      clearTimeout(focusSaveTimer);
+      focusSaveTimer = setTimeout(saveFocus, 800);   // not a storage write per key press
     }
+  }
+
+  var focusSaveTimer = null;
+  function saveFocus() {
+    clearTimeout(focusSaveTimer);
+    focusSaveTimer = null;
+    if (focusKey) ls.set('gh.focus', focusKey);
   }
 
   // ---------- app grid: every other app, A-Z, under the dock ----------
@@ -560,8 +607,19 @@
     }
   }
 
+  // Rebuilt only when the TV's app list changed: a rebuild re-creates every
+  // grid tile and decodes every icon again.
+  var gridSig = null;
   function loadGrid() {
-    return P.listApps().then(function (list) { allApps = list; buildGrid(); });
+    return P.listApps().then(function (list) {
+      if (!list.length && allApps.length) return;           // timed out: keep what we have
+      var sig = list.map(function (a) { return a.id + '|' + a.name + '|' + (a.iconPath || ''); }).join(',') +
+        '#' + Object.keys(apps).map(function (k) { return apps[k].id; }).join(',');
+      if (sig === gridSig) return;
+      gridSig = sig;
+      allApps = list;
+      buildGrid();
+    });
   }
 
   function setGridFocus(i) {
@@ -1084,6 +1142,8 @@
     }
     if ([KEY.LEFT, KEY.RIGHT, KEY.UP, KEY.DOWN, KEY.ENTER].indexOf(k) < 0) return;
     e.preventDefault();
+    lastKeyAt = Date.now();
+    if (backdrop) backdrop.hold(2500);
     if (mode === 'menu') {
       if (k === KEY.ENTER) {
         if (waitEnterRelease || e.repeat) return;   // OK still held from the long press
@@ -1191,7 +1251,9 @@
         return {
           key: 'w:' + file,
           url: base + file,
-          credit: [w.title, w.author, w.licence_short || shortLicence(w.licence || w.license)].filter(Boolean).join(' · '),
+          credit: [w.title && w.year ? w.title + ', ' + w.year : w.title, w.author,
+            w.licence_short || shortLicence(w.licence || w.license)].filter(Boolean).join(' · '),
+          about: w.about || '',           // a sentence or two about a painting
           times: Array.isArray(w.times) && w.times.length ? w.times : null,
           user: false
         };
@@ -1234,7 +1296,20 @@
     c.classList.remove('on');
     clearTimeout(creditTimer);
     creditTimer = setTimeout(function () {
-      c.textContent = it.credit || '';
+      c.textContent = '';
+      if (it.credit) {
+        var line = document.createElement('div');
+        line.className = 'credit-line';
+        line.textContent = it.credit;
+        c.appendChild(line);
+      }
+      if (it.about) {
+        var about = document.createElement('div');
+        about.className = 'credit-about';
+        about.textContent = it.about;
+        c.appendChild(about);
+      }
+      c.classList.toggle('art', !!it.about);
       if (it.credit) c.classList.add('on');
     }, 500);
   }
@@ -1292,6 +1367,7 @@
   // ---------- multitasking ----------
   function onVisibility() {
     if (document.hidden) {
+      saveFocus();
       document.documentElement.classList.add('paused');
       clearInterval(clockTimer);
       clearInterval(pollTimer);
@@ -1313,15 +1389,30 @@
     pollTimer = setInterval(refresh, cfg.pollEveryMs);
     if (backdrop) backdrop.resume();
     if (nowPlaying) nowPlaying.start();
-    ensureService();
-    resolveApps().then(loadGrid);
-    loadInputs();
+    // The viewer usually starts pressing keys right away; sync the apps and
+    // inputs once they pause, not in the middle of the first moves.
+    whenIdle(function () {
+      ensureService();
+      resolveApps().then(loadGrid);
+      loadInputs();
+    });
+  }
+
+  var lastKeyAt = 0;
+  var idleTimer = null;
+  function whenIdle(fn) {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () {
+      var wait = lastKeyAt + 1500 - Date.now();
+      if (wait > 0) { whenIdle(fn); return; }
+      fn();
+    }, Math.max(800, lastKeyAt + 1500 - Date.now()));
   }
 
   // ---------- performance guard ----------
   // If the TV cannot keep the slow drift smooth, keep the photos still.
   function frameProbe() {
-    if (!window.requestAnimationFrame || Q.still === '1' || cfg.preview) return;
+    if (!window.requestAnimationFrame || Q.still === '1' || cfg.preview || !cfg.photoDrift) return;
     var times = [];
     var last = 0;
     var end = Date.now() + 3000;
@@ -1355,6 +1446,7 @@
 
   function init() {
     if (Q.still === '1') document.documentElement.classList.add('still');
+    if (cfg.photoDrift && Q.still !== '1') document.documentElement.classList.add('drift');
     fitStage();
     window.addEventListener('resize', fitStage);
     renderClock();
@@ -1369,7 +1461,7 @@
 
     backdrop = new GH.Backdrop($('bg-a'), $('bg-b'), {
       interval: cfg.photoIntervalMs, fade: cfg.fadeMs, scale: cfg.kenBurnsScale,
-      still: Q.still === '1', onShow: showCredit, eligible: rightTime
+      still: Q.still === '1' || !cfg.photoDrift, onShow: showCredit, eligible: rightTime
     });
     // A new part of the day: move on from a photo that no longer fits it.
     if (GH.Sky) GH.Sky.onPeriod(function () {
@@ -1397,6 +1489,7 @@
       if (Q.menu === '1') setTimeout(openMenu, 300);
     });
     pollTimer = setInterval(refresh, cfg.pollEveryMs);
+    setTimeout(function () { S.warm(); }, 1500);
     frameProbe();
   }
 
