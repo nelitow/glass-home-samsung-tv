@@ -105,7 +105,7 @@
   var FW = ['#ffd60a', '#ff453a', '#64d2ff', '#30d158', '#ff9ff3', '#ffffff', '#ff9f0a', '#bf5af2'];
 
   function burst() {
-    if (!document.hidden && !html.classList.contains('paused') && !html.classList.contains('vibe')) {
+    if (!document.hidden && !html.classList.contains('paused')) {
       var x = rnd(260, 1660), y = rnd(140, 560);
       var color = FW[Math.floor(rnd(0, FW.length))];
       var box = div('burst');

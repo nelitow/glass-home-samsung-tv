@@ -39,7 +39,11 @@ const quiet = flag('--quiet');
 const tvApps = opt('--tv-apps', null);
 const tvMock = tvApps ? 'window.GH_MOCK = ' + JSON.stringify({
   apps: JSON.parse(fs.readFileSync(tvApps, 'utf8')).filter((a) => a.show !== false)
-    .map((a) => ({ id: a.id, name: a.name, iconPath: a.icon }))
+    .map((a) => ({ id: a.id, name: a.name, iconPath: a.icon })),
+  videoSources: {
+    connected: [{ type: 'HDMI', number: 1, signal: true }, { type: 'HDMI', number: 2, signal: false }],
+    disconnected: [{ type: 'HDMI', number: 3, signal: null }]
+  }
 }) + ';' : null;
 let dataDir = opt('--data', null);
 const tempData = !dataDir;

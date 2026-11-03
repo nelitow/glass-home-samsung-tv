@@ -207,6 +207,63 @@
     });
   };
 
+  // External video inputs (HDMI and the rest). systeminfo VIDEOSOURCE lists
+  // the sources with a device attached (connected) and without (disconnected),
+  // each { type, number, signal }. Resolves null when the TV can't report them.
+  P.videoSources = function () {
+    if (!tz || !tz.systeminfo) {
+      return Promise.resolve((window.GH_MOCK && window.GH_MOCK.videoSources) || null);
+    }
+    return new Promise(function (resolve) {
+      var done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; resolve(null); } }, 3000);
+      try {
+        tz.systeminfo.getPropertyValue('VIDEOSOURCE', function (src) {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve({ connected: (src && src.connected) || [], disconnected: (src && src.disconnected) || [] });
+        }, function () { if (done) return; done = true; clearTimeout(timer); resolve(null); });
+      } catch (e) { done = true; clearTimeout(timer); resolve(null); }
+    });
+  };
+
+  // Switches the TV to an external source and shows it full screen. `want` is
+  // { type, number }; the live source object is read back from VIDEOSOURCE so
+  // the platform gets one of its own objects (tv.window privilege, public).
+  P.showSource = function (want) {
+    if (!tz || !tz.tvwindow || !tz.systeminfo) return previewLaunch('source ' + want.type + ' ' + want.number);
+    return new Promise(function (resolve, reject) {
+      try {
+        tz.systeminfo.getPropertyValue('VIDEOSOURCE', function (src) {
+          var all = ((src && src.connected) || []).concat((src && src.disconnected) || []);
+          var live = null;
+          for (var i = 0; i < all.length; i++) {
+            if (all[i].type === want.type && all[i].number === want.number) { live = all[i]; break; }
+          }
+          if (!live) { reject(new Error('input not found')); return; }
+          try {
+            tz.tvwindow.setSource(live, function () {
+              try {
+                tz.tvwindow.show(function () { resolve('source'); }, function (e) { reject(e); },
+                  ['0', '0', '100%', '100%'], 'MAIN', 'FRONT');
+              } catch (e) { reject(e); }
+            }, function (e) { reject(e); }, 'MAIN');
+          } catch (e) { reject(e); }
+        }, function (e) { reject(e); });
+      } catch (e) { reject(e); }
+    });
+  };
+
+  // Hides the external-source window, bringing this home screen back to front.
+  P.hideWindow = function () {
+    if (!tz || !tz.tvwindow) return Promise.resolve();
+    return new Promise(function (resolve) {
+      try { tz.tvwindow.hide(function () { resolve(); }, function () { resolve(); }, 'MAIN'); }
+      catch (e) { resolve(); }
+    });
+  };
+
   // Free internal storage, for the + panel. Resolves null when unavailable.
   P.storage = function () {
     if (!tz || !tz.systeminfo) return Promise.resolve(null);

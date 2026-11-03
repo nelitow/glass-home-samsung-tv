@@ -17,7 +17,7 @@
   --lg-blur: blur(36px) saturate(190%) brightness(1.06);
   /* Static "frosted glass" for the dock tiles — no live backdrop-filter, so the
      12 always-visible tiles don't re-blur the moving photo every frame (the
-     app icons cover the face anyway; only name/monogram/+/Vibe tiles show it). */
+     app icons cover the face anyway; only name/monogram/+ tiles show it). */
   --lg-frost: linear-gradient(158deg, rgba(118, 124, 140, 0.52) 0%, rgba(44, 48, 60, 0.66) 100%);
   --lg-rim: inset 0 1.5px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(255, 255, 255, 0.10),
             inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 18px 30px -18px rgba(255, 255, 255, 0.22);
@@ -392,16 +392,16 @@ html.lite #wx-week {
   width: var(--tile);
   height: var(--tile);
   border-radius: var(--tile-radius);
-  transition: transform 0.28s var(--ease);
+  transition: transform 0.16s var(--ease);
   will-change: transform;
 }
 .tile .glow {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 26px 48px rgba(0, 0, 0, 0.58), 0 0 0 1.5px rgba(255, 255, 255, 0.45), 0 0 50px rgba(255, 255, 255, 0.24);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.55), 0 0 0 1.5px rgba(255, 255, 255, 0.45);
   opacity: 0;
-  transition: opacity 0.28s ease;
+  transition: opacity 0.16s ease;
 }
 .tile .face {
   position: absolute;
@@ -418,15 +418,6 @@ html.lite #wx-week {
 .tile.focused {
   transform: translateY(-14px) scale(1.18);
   z-index: 2;
-}
-/* parallax: the focused icon tilts slowly and its highlight follows the light */
-.tile.focused .face { animation: tilt 7s ease-in-out 0.3s infinite; }
-@keyframes tilt {
-  0%   { transform: perspective(700px) rotateX(0deg) rotateY(0deg); }
-  25%  { transform: perspective(700px) rotateX(5deg) rotateY(-7deg); }
-  50%  { transform: perspective(700px) rotateX(-3deg) rotateY(-2deg); }
-  75%  { transform: perspective(700px) rotateX(-5deg) rotateY(7deg); }
-  100% { transform: perspective(700px) rotateX(0deg) rotateY(0deg); }
 }
 .tile .spec {
   position: absolute;
@@ -446,14 +437,8 @@ html.lite #wx-week {
   opacity: 0;
   transition: opacity 0.4s ease;
 }
-.tile.focused .spec::before { opacity: 1; animation: spec 7s ease-in-out 0.3s infinite; }
-@keyframes spec {
-  0%   { transform: translate3d(-18%, -30%, 0); }
-  25%  { transform: translate3d(14%, -34%, 0); }
-  50%  { transform: translate3d(4%, -22%, 0); }
-  75%  { transform: translate3d(-16%, -14%, 0); }
-  100% { transform: translate3d(-18%, -30%, 0); }
-}
+/* a still highlight on the focused tile (no per-move animation, for speed) */
+.tile.focused .spec::before { opacity: 1; transform: translate3d(-8%, -24%, 0); }
 .tile.focused .glow { opacity: 1; }
 
 .tile .app-icon,
@@ -511,25 +496,6 @@ html.lite #wx-week {
   color: rgba(255, 255, 255, 0.86);
 }
 .tile-add .plus { width: 58px; height: 58px; }
-
-/* one subtle sweep of light across the focused tile */
-.tile .sheen {
-  position: absolute;
-  top: -30%;
-  left: 0;
-  width: 55%;
-  height: 160%;
-  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.0) 25%, rgba(255, 255, 255, 0.30) 50%, rgba(255, 255, 255, 0) 75%, rgba(255, 255, 255, 0) 100%);
-  transform: translateX(-170%) rotate(8deg);
-  opacity: 0;
-  pointer-events: none;
-}
-.tile.focused .sheen { animation: sheen 1.25s cubic-bezier(0.35, 0.1, 0.25, 1) 0.15s 1 both; }
-@keyframes sheen {
-  0% { transform: translateX(-170%) rotate(8deg); opacity: 0; }
-  12% { opacity: 1; }
-  100% { transform: translateX(260%) rotate(8deg); opacity: 0; }
-}
 
 /* name of the focused tile, under the dock */
 #label {
@@ -740,65 +706,40 @@ html.in-grid #dock, html.in-grid #credit { opacity: 0; }
 }
 .wxd-foot { margin-top: 14px; font-size: 16px; color: rgba(255, 255, 255, 0.42); text-align: right; }
 
-/* ---------- vibe: warm light ---------- */
-.tile-vibe .face { background: radial-gradient(circle at 50% 60%, #3a1a0c 0%, #140805 100%); }
+/* ---------- system tiles: Samsung Home and external inputs ---------- */
 .tile-samsung .face { background: linear-gradient(150deg, #1428a0 0%, #0a1657 100%); color: #fff; }
-.tile .home-glyph { width: 58%; height: 58%; opacity: 0.95; }
-.tile .vibe-orb {
-  width: 64%;
-  height: 64%;
-  border-radius: 50%;
-  background: radial-gradient(circle at 45% 40%, #fff3d6 0%, #ffc46b 25%, #ff7a2f 55%, rgba(255, 90, 40, 0) 72%);
-  animation: orb 4s ease-in-out infinite alternate;
-}
-@keyframes orb { from { transform: scale(0.9); opacity: 0.85; } to { transform: scale(1.08); opacity: 1; } }
-#vibe {
+/* Glyphs are <svg>: the TV's older engine mis-sizes an SVG flex item given a
+   percentage, so size them with an explicit length off --tile instead. */
+.tile .home-glyph { width: calc(var(--tile, 150px) * 0.62); height: calc(var(--tile, 150px) * 0.62); flex: none; opacity: 0.95; }
+.tile-input .face { background: linear-gradient(150deg, #243a44 0%, #0e1a20 100%); color: #cfe8f2; }
+/* glyph + number stacked and centred as one group, same footprint as an app icon */
+.tile .input-stack {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-  background: radial-gradient(120% 100% at 50% 110%, #2a1006 0%, #120604 55%, #070302 100%);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 1.4s ease, visibility 0s linear 1.4s;
-  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
-html.vibe #vibe { opacity: 1; visibility: visible; transition: opacity 1.4s ease, visibility 0s; }
-#vibe .glow {
+.tile .input-glyph { width: calc(var(--tile, 150px) * 0.48); height: calc(var(--tile, 150px) * 0.48); flex: none; opacity: 0.95; }
+.tile .input-num {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  color: #eaf6fb;
+}
+.tile .input-live {
   position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  mix-blend-mode: screen;
-  will-change: transform, opacity;
-  animation-play-state: paused;
+  background: #37d67a;
+  box-shadow: 0 0 10px rgba(55, 214, 122, 0.8);
 }
-html.vibe #vibe .glow { animation-play-state: running; }
-#vibe .g1 { left: -10%; top: 20%; width: 1300px; height: 1300px;
-  background: radial-gradient(circle, rgba(255, 150, 60, 0.55) 0%, rgba(255, 110, 40, 0.18) 40%, rgba(255, 90, 30, 0) 68%);
-  animation: drift1 38s ease-in-out infinite alternate, breathe 7s ease-in-out infinite alternate; }
-#vibe .g2 { left: 40%; top: -25%; width: 1100px; height: 1100px;
-  background: radial-gradient(circle, rgba(255, 196, 110, 0.5) 0%, rgba(255, 160, 70, 0.15) 42%, rgba(255, 140, 60, 0) 68%);
-  animation: drift2 46s ease-in-out infinite alternate, breathe 9s ease-in-out -3s infinite alternate; }
-#vibe .g3 { left: 55%; top: 35%; width: 1200px; height: 1200px;
-  background: radial-gradient(circle, rgba(255, 96, 70, 0.45) 0%, rgba(230, 60, 60, 0.14) 40%, rgba(200, 40, 50, 0) 68%);
-  animation: drift3 52s ease-in-out infinite alternate, breathe 11s ease-in-out -5s infinite alternate; }
-#vibe .g4 { left: 15%; top: 55%; width: 900px; height: 900px;
-  background: radial-gradient(circle, rgba(255, 210, 140, 0.45) 0%, rgba(255, 170, 90, 0.12) 45%, rgba(255, 150, 70, 0) 68%);
-  animation: drift4 33s ease-in-out infinite alternate, breathe 6s ease-in-out -2s infinite alternate; }
-#vibe .g5 { left: 30%; top: 25%; width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(255, 236, 200, 0.35) 0%, rgba(255, 200, 130, 0.1) 45%, rgba(255, 180, 110, 0) 68%);
-  animation: drift5 27s ease-in-out infinite alternate, flicker 3.1s ease-in-out infinite; }
-.vibe-grain {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.55) 100%);
-}
-@keyframes drift1 { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(380px, -160px, 0) scale(1.15); } }
-@keyframes drift2 { from { transform: translate3d(0, 0, 0) scale(1.1); } to { transform: translate3d(-420px, 220px, 0) scale(0.95); } }
-@keyframes drift3 { from { transform: translate3d(0, 0, 0) scale(0.95); } to { transform: translate3d(-300px, -260px, 0) scale(1.12); } }
-@keyframes drift4 { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(520px, -120px, 0) scale(1.2); } }
-@keyframes drift5 { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(260px, 180px, 0); } }
-@keyframes breathe { from { opacity: 0.7; } to { opacity: 1; } }
-@keyframes flicker { 0%, 100% { opacity: 0.8; } 20% { opacity: 0.95; } 45% { opacity: 0.72; } 70% { opacity: 1; } }
-
 /* ---------- living sky (js/sky.js): weather and time of day over the photos ---------- */
 #sky, #sky > div, .sky-drops, .sky-rain { position: absolute; inset: 0; pointer-events: none; }
 #sky { overflow: hidden; }
@@ -866,7 +807,6 @@ html.vibe #vibe .glow { animation-play-state: running; }
   100% { transform: translate3d(0, 1110px, 0); }
 }
 .sky-flash { background: rgba(225, 232, 255, 1); opacity: 0; }
-html.vibe #sky .sky-drops { display: none; }
 
 /* ---------- rain alert ---------- */
 #rain-alert {
@@ -918,24 +858,6 @@ html.art-on #np-state i { background: #fff; }
 }
 .launch-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .launch-name { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 22px; font-weight: 600; }
-.launch-splash {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 220px;
-  height: 220px;
-  margin: -110px 0 0 -110px;
-  border-radius: 50px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  font-weight: 600;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
-  opacity: 0;
-}
-.launch-splash img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* ---------- seasons (js/seasons.js) ---------- */
 #season { position: absolute; inset: 0; pointer-events: none; }
@@ -999,7 +921,6 @@ html.art-on #np-state i { background: #fff; }
 }
 @keyframes nyIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: none; } }
 @keyframes nyGlow { from { opacity: 0.85; } to { opacity: 1; } }
-html.vibe #season, html.vibe #rain-alert { opacity: 0; }
 
 /* ---------- long-press menu ---------- */
 #menu {
@@ -1219,5 +1140,3 @@ html.lite .tile .face {
   backdrop-filter: none;
   background: rgba(60, 60, 66, 0.72);
 }
-html.lite .tile.focused .face,
-html.lite .tile.focused .spec::before { animation: none; }

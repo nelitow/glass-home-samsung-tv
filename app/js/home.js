@@ -77,13 +77,14 @@
   var retryTimer = null;
   var storage = null;
   var hidden = ls.get('gh.hidden') || [];
-  var appOrder = ls.get('gh.appOrder') || [];
+  var appUsage = ls.get('gh.appUsage') || {};   // appKey -> { count, last } for frecency ordering
   var ytMode = ls.get('gh.ytMode') || cfg.youtubeMode;
   var allApps = [];
   var gridItems = [];
   var gridFocus = 0;
   var nowInfo = null;
   var nowPlaying = null;
+  var inputs = [];                  // connected HDMI (and other) external inputs
   if (YT_MODES.indexOf(ytMode) < 0) ytMode = 'payload';
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -149,11 +150,32 @@
   }
 
   // ---------- dock model ----------
+  // Frecency: how often an app is opened, weighted towards recent use. A launch
+  // counts for 1 and fades to half its weight every FRECENCY_HALFLIFE days, so
+  // the apps you reach for now float to the front. Never-opened apps score 0 and
+  // keep their config order, at the end.
+  var FRECENCY_HALFLIFE = 10 * 24 * 60 * 60 * 1000;
+  function frecency(k) {
+    var u = appUsage[k];
+    if (!u || !u.count) return 0;
+    var age = Math.max(0, Date.now() - (u.last || 0));
+    return u.count * Math.pow(2, -age / FRECENCY_HALFLIFE);
+  }
+
+  function recordAppUse(k) {
+    var u = appUsage[k] || { count: 0, last: 0 };
+    u.count += 1;
+    u.last = Date.now();
+    appUsage[k] = u;
+    ls.set('gh.appUsage', appUsage);
+  }
+
+  // Config order, then stable-sorted by frecency (highest first). Ties and
+  // unused apps keep config order.
   function orderedAppKeys() {
-    var keys = [];
-    appOrder.forEach(function (k) { if (defByKey[k] && keys.indexOf(k) < 0) keys.push(k); });
-    defs.forEach(function (d) { if (keys.indexOf(d.key) < 0) keys.push(d.key); });
-    return keys;
+    var keys = defs.map(function (d, i) { return { k: d.key, i: i, s: frecency(d.key) }; });
+    keys.sort(function (a, b) { return b.s - a.s || a.i - b.i; });
+    return keys.map(function (x) { return x.k; });
   }
 
   function buildItems() {
@@ -172,14 +194,25 @@
         tint: s.type === 'youtube' ? '#ff0033' : 'hsl(' + hueFor(hostOf(s.url) || s.name || '') + ', 70%, 50%)'
       });
     });
-    if (cfg.vibe) list.push({ kind: 'vibe', key: 'vibe', label: 'Vibe', tint: '#ff8a3d' });
+    if (cfg.inputs !== false) {
+      inputs.forEach(function (src) {
+        list.push({ kind: 'input', key: 'input:' + src.type + src.number, srcType: src.type, srcNum: src.number,
+          signal: src.signal, label: inputLabel(src), tint: '#3aa0c8' });
+      });
+    }
     if (cfg.samsungHome) list.push({ kind: 'samsung', key: 'samsung', label: 'Samsung Home', id: cfg.samsungHome, tint: '#1428a0' });
     list.push({ kind: 'add', key: 'add', label: 'Add photos and shortcuts' });
     return list;
   }
 
   function signature(it) {
-    return [it.kind, it.label, it.icon || '', it.videoId || '', it.iconW || 0].join('|');
+    return [it.kind, it.label, it.icon || '', it.videoId || '', it.iconW || 0, it.signal ? 1 : 0].join('|');
+  }
+
+  // "HDMI 2", or "AV 1" for the other input kinds.
+  function inputLabel(src) {
+    var name = src.type === 'HDMI' ? 'HDMI' : src.type === 'COMP' ? 'Component' : src.type;
+    return name + (src.number ? ' ' + src.number : '');
   }
 
   function hueFor(seed) {
@@ -297,8 +330,24 @@
         fail();
       }
       face.appendChild(div('play'));
-    } else if (it.kind === 'vibe') {
-      face.appendChild(div('vibe-orb'));
+    } else if (it.kind === 'input') {
+      var nsi = 'http://www.w3.org/2000/svg';
+      var is = document.createElementNS(nsi, 'svg');
+      is.setAttribute('viewBox', '0 0 48 48');
+      is.setAttribute('class', 'input-glyph');
+      var ip = document.createElementNS(nsi, 'path');
+      ip.setAttribute('d', 'M9 14 H39 V31 H9 Z M18 37 H30 M24 31 V37');
+      ip.setAttribute('fill', 'none');
+      ip.setAttribute('stroke', 'currentColor');
+      ip.setAttribute('stroke-width', '2.4');
+      ip.setAttribute('stroke-linecap', 'round');
+      ip.setAttribute('stroke-linejoin', 'round');
+      is.appendChild(ip);
+      var stack = div('input-stack');
+      stack.appendChild(is);
+      stack.appendChild(div('input-num', String(it.srcNum || '')));
+      face.appendChild(stack);
+      if (it.signal) face.appendChild(div('input-live'));
     } else if (it.kind === 'samsung') {
       var ns = 'http://www.w3.org/2000/svg';
       var hs = document.createElementNS(ns, 'svg');
@@ -317,7 +366,6 @@
       face.appendChild(plusGlyph());
     }
     face.appendChild(div('spec'));
-    face.appendChild(div('sheen'));
     return el;
   }
 
@@ -337,7 +385,7 @@
     });
     Object.keys(tileEls).forEach(function (k) { if (!seen[k]) delete tileEls[k]; });
     // Touch the DOM only when the row really changed: moving an element
-    // restarts its CSS animations (the focus sheen would replay on every sync).
+    // restarts its CSS transitions and reflows the row needlessly on every sync.
     var same = row.children.length === els.length;
     for (var c = 0; same && c < els.length; c++) same = row.children[c] === els[c];
     if (!same) {
@@ -404,6 +452,7 @@
   var shelfSub = $('shelf-sub');
   var shelfKey = null;
   var shelfTimer = null;
+  var shelfRaf = null;
 
   function playingIn(it) {
     return nowInfo && it && it.kind === 'app' && it.id === nowInfo.appId ? nowInfo : null;
@@ -415,7 +464,7 @@
     if (it.kind === 'app') return 'Press OK to open';
     if (it.kind === 'youtube') return 'YouTube';
     if (it.kind === 'web') return hostOf(it.url);
-    if (it.kind === 'vibe') return 'Warm light for the room';
+    if (it.kind === 'input') return it.signal ? 'External input · showing a signal' : 'External input';
     if (it.kind === 'samsung') return 'Open Samsung Smart Hub';
     return 'From your phone, on the home Wi-Fi';
   }
@@ -423,15 +472,21 @@
   function renderShelf(it, force) {
     if (it.key === shelfKey && !force) return;
     shelfKey = it.key;
-    var next = washA.classList.contains('show') ? washB : washA;
-    var prev = next === washA ? washB : washA;
-    var np = playingIn(it);
-    var tint = artTint && np && np.state === 'PLAY' ? artTint : it.tint;
-    if (tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + tint + ' 0%, transparent 70%)';
-    next.classList.toggle('show', !!tint);
-    prev.classList.remove('show');
     $('shelf').classList.remove('on');
     clearTimeout(shelfTimer);
+    if (shelfRaf) cancelAnimationFrame(shelfRaf);
+    // The colour wash is a big gradient repaint; do it on the next frame so the
+    // tile movement in this frame stays instant. The text follows a touch later.
+    shelfRaf = requestAnimationFrame(function () {
+      shelfRaf = null;
+      var next = washA.classList.contains('show') ? washB : washA;
+      var prev = next === washA ? washB : washA;
+      var np = playingIn(it);
+      var tint = artTint && np && np.state === 'PLAY' ? artTint : it.tint;
+      if (tint) next.style.backgroundImage = 'radial-gradient(ellipse 75% 95% at 18% 0%, ' + tint + ' 0%, transparent 70%)';
+      next.classList.toggle('show', !!tint);
+      prev.classList.remove('show');
+    });
     shelfTimer = setTimeout(function () {
       shelfTitle.textContent = it.label;
       shelfSub.textContent = shelfSubFor(it);
@@ -594,19 +649,44 @@
     mode = 'weather';
   }
 
-  // ---------- vibe: warm light drifting across the screen, nothing else ----------
-  function openVibe() {
-    mode = 'vibe';
-    document.documentElement.classList.add('vibe');
-    label.classList.remove('on');
-    if (backdrop) backdrop.pause();
+  // ---------- external inputs (HDMI etc) ----------
+  // The TV shows the input on a hardware video plane in front of this page;
+  // the page keeps the remote, so Back brings us back.
+  function openSource(it) {
+    P.showSource({ type: it.srcType, number: it.srcNum }).then(function (how) {
+      if (String(how).indexOf('preview:') === 0) { toast('Preview: would show ' + it.label); return; }
+      mode = 'source';
+      document.documentElement.classList.add('on-source');
+      label.classList.remove('on');
+      if (backdrop) backdrop.pause();
+      toast('Showing ' + it.label + ' · press Back to return', 4000);
+    }, function (e) {
+      toast('Couldn’t switch to ' + it.label + (e && e.message ? ' (' + e.message + ')' : ''), 4500);
+    });
   }
 
-  function closeVibe() {
+  function closeSource() {
+    P.hideWindow();
     mode = 'dock';
-    document.documentElement.classList.remove('vibe');
+    document.documentElement.classList.remove('on-source');
     label.classList.add('on');
     if (backdrop) backdrop.resume();
+    setFocus(focus, true);
+  }
+
+  // Reads the connected external inputs and rebuilds the dock when they change.
+  function loadInputs() {
+    if (cfg.inputs === false) return Promise.resolve();
+    return P.videoSources().then(function (src) {
+      if (!src) { if (inputs.length) { inputs = []; rebuildDock(); } return; }
+      var next = (src.connected || []).map(function (s) {
+        return { type: s.type, number: s.number, signal: s.signal === true };
+      });
+      var sig = function (list) {
+        return list.map(function (s) { return s.type + s.number + (s.signal ? 1 : 0); }).join(',');
+      };
+      if (sig(next) !== sig(inputs)) { inputs = next; rebuildDock(); }
+    }, function () { /* leave the inputs as they are */ });
   }
 
   // ---------- now playing (other apps' media, e.g. Spotify) ----------
@@ -700,28 +780,25 @@
     card.style.width = w + 'px';
     card.style.height = h + 'px';
     card.style.background = it.tint || '#111114';
+    // The icon stays in the card and fades out early, before the zoom gets big
+    // enough to show it pixelated; the tint fills the screen behind it.
     var icon = face.querySelector('img');
     var big = icon ? icon.cloneNode(false) : div('launch-name');
     if (!icon) big.textContent = it.label;
     big.className = icon ? 'launch-img' : 'launch-name';
     card.appendChild(big);
-    var splash = div('launch-splash');
-    if (icon) { var si = icon.cloneNode(false); si.className = ''; splash.appendChild(si); } else splash.textContent = it.label;
     launchEl.textContent = '';
     launchEl.appendChild(card);
-    launchEl.appendChild(splash);
     launchEl.classList.add('on');
-    var scale = Math.max(1920 / w, 1080 / h) * 1.6;
+    var scale = Math.max(1920 / w, 1080 / h);
     var dx = 960 - (x + w / 2), dy = 540 - (y + h / 2);
-    var ease = 'cubic-bezier(0.55, 0, 0.25, 1)';
+    var ease = 'cubic-bezier(0.4, 0, 0.2, 1)';
     launching = {
       anims: [
         card.animate([{ transform: 'translate3d(0, 0, 0) scale(1)' },
           { transform: 'translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(' + scale.toFixed(2) + ')' }],
-          { duration: 520, easing: ease, fill: 'forwards' }),
-        big.animate([{ opacity: 1 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }], { duration: 520, easing: 'ease-in', fill: 'forwards' }),
-        splash.animate([{ opacity: 0, transform: 'scale(0.86)' }, { opacity: 1, transform: 'scale(1)' }],
-          { duration: 320, delay: 360, easing: 'ease-out', fill: 'both' })
+          { duration: 380, easing: ease, fill: 'forwards' }),
+        big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease-in', fill: 'forwards' })
       ],
       guard: null
     };
@@ -740,9 +817,7 @@
       launchEl.textContent = '';
       return;
     }
-    l.anims[2].reverse();
-    l.anims[1].reverse();
-    l.anims[0].reverse();
+    l.anims.forEach(function (a) { try { a.reverse(); } catch (e) { /* ignore */ } });
     l.anims[0].onfinish = function () {
       if (launching) return;
       launchEl.classList.remove('on');
@@ -755,7 +830,6 @@
     if (!it) return;
     S.select();
     if (it.kind === 'add') { openPanel(); return; }
-    if (it.kind === 'vibe') { S.select(); openVibe(); return; }
     if (it.kind === 'samsung') {
       P.launchApp(it.id).then(function (how) {
         if (String(how).indexOf('preview:') === 0) toast('Preview: would open Samsung Home');
@@ -764,6 +838,9 @@
       });
       return;
     }
+    if (it.kind === 'input') { openSource(it); return; }
+    // Count the launch for frecency; the dock re-sorts on return (while hidden).
+    if (it.kind === 'app') recordAppUse(it.appKey);
     // The app starts loading at once; the zoom plays while it does.
     var zoom = startLaunch(it);
     (function () {
@@ -789,23 +866,30 @@
   }
 
   // ---------- long-press menu ----------
+  // Only shortcuts are hand-ordered now; apps sort themselves by frecency.
   function groupOf(it) {
-    return items.filter(function (x) { return it.kind === 'app' ? x.kind === 'app' : (x.kind === 'web' || x.kind === 'youtube'); });
+    return items.filter(function (x) { return x.kind === 'web' || x.kind === 'youtube'; });
   }
 
   function openMenu() {
     var it = items[focus];
-    if (!it || it.kind === 'add' || it.kind === 'vibe' || it.kind === 'samsung') return;
-    var group = groupOf(it);
-    var gi = group.indexOf(it);
-    menuItems = [
-      { label: 'Move left', disabled: gi <= 0, run: function () { moveItem(it, -1); } },
-      { label: 'Move right', disabled: gi >= group.length - 1, run: function () { moveItem(it, 1); } },
-      it.kind === 'app'
-        ? { label: 'Hide', run: function () { hideApp(it); } }
-        : { label: 'Remove', run: function () { removeShortcut(it); } },
-      { label: 'Cancel', run: function () {} }
-    ];
+    if (!it || it.kind === 'add' || it.kind === 'samsung' || it.kind === 'input') return;
+    if (it.kind === 'app') {
+      // Apps are auto-ordered by use; the only action is Hide.
+      menuItems = [
+        { label: 'Hide', run: function () { hideApp(it); } },
+        { label: 'Cancel', run: function () {} }
+      ];
+    } else {
+      var group = groupOf(it);
+      var gi = group.indexOf(it);
+      menuItems = [
+        { label: 'Move left', disabled: gi <= 0, run: function () { moveItem(it, -1); } },
+        { label: 'Move right', disabled: gi >= group.length - 1, run: function () { moveItem(it, 1); } },
+        { label: 'Remove', run: function () { removeShortcut(it); } },
+        { label: 'Cancel', run: function () {} }
+      ];
+    }
     menuFocus = 0;
     while (menuItems[menuFocus].disabled) menuFocus += 1;
     menu.textContent = '';
@@ -835,20 +919,12 @@
     mode = 'dock';
   }
 
+  // Reorders a shortcut within the shortcut group (apps are auto-ordered).
   function moveItem(it, dir) {
     var group = groupOf(it);
     var gi = group.indexOf(it);
     var gj = gi + dir;
     if (gj < 0 || gj >= group.length) return;
-    if (it.kind === 'app') {
-      var keys = group.map(function (x) { return x.appKey; });
-      var t = keys[gi]; keys[gi] = keys[gj]; keys[gj] = t;
-      var full = orderedAppKeys().filter(function (k) { return keys.indexOf(k) < 0; });
-      appOrder = keys.concat(full);
-      ls.set('gh.appOrder', appOrder);
-      rebuildDock(it.key);
-      return;
-    }
     var ids = shortcuts.map(function (s) { return s.id; });
     var a = ids.indexOf(it.scId);
     var b = a + dir;
@@ -1002,7 +1078,7 @@
       else if (mode === 'panel') { S.back(); closePanel(); }
       else if (mode === 'grid') { S.back(); exitGrid(); }
       else if (mode === 'wxpanel') { S.back(); closeWeather(); }
-      else if (mode === 'vibe') { S.back(); closeVibe(); }
+      else if (mode === 'source') { S.back(); closeSource(); }
       else if (mode === 'weather') { S.back(); leaveWeather(); }
       return;                                   // at the top level Back does nothing
     }
@@ -1043,7 +1119,7 @@
       return;
     }
     if (mode === 'grid') { gridKey(k, e); return; }
-    if (mode === 'vibe') { if (k === KEY.ENTER && !e.repeat) { S.back(); closeVibe(); } return; }
+    if (mode === 'source') return;       // the input is in front; only Back returns (handled above)
     if (mode === 'wxpanel') {
       if (k === KEY.ENTER && !e.repeat) { S.back(); closeWeather(); }
       return;
@@ -1239,6 +1315,7 @@
     if (nowPlaying) nowPlaying.start();
     ensureService();
     resolveApps().then(loadGrid);
+    loadInputs();
   }
 
   // ---------- performance guard ----------
@@ -1312,9 +1389,9 @@
     loadMock().then(resolveApps).then(loadGrid).then(function () {
       nowPlaying.start();
       if (Q.grid === '1') enterGrid();
-      if (Q.vibe === '1') openVibe();
       if (Q.wx === 'panel') setTimeout(function () { focusWeather(); openWeather(); }, 300);
       if (Q.focus && /^\d+$/.test(Q.focus)) setFocus(+Q.focus);
+      loadInputs();
       ensureService();
       if (Q.panel === '1') setTimeout(openPanel, 300);
       if (Q.menu === '1') setTimeout(openMenu, 300);

@@ -141,7 +141,7 @@
     flashTimer = null;
     if (fx !== 'storm') return;
     flashTimer = setTimeout(function () {
-      if (!document.hidden && !html.classList.contains('vibe') && built.flash.animate) {
+      if (!document.hidden && built.flash.animate) {
         built.flash.animate([{ opacity: 0 }, { opacity: 0.5 }, { opacity: 0.08 }, { opacity: 0.38 }, { opacity: 0 }],
           { duration: 700, easing: 'ease-out' });
       }
@@ -179,7 +179,7 @@
   }
 
   function checkRain(w) {
-    if (cfg.rainAlert === false || !alertEl || !GH.Weather || document.hidden || html.classList.contains('vibe')) return;
+    if (cfg.rainAlert === false || !alertEl || !GH.Weather || document.hidden) return;
     var at = w && w.rainAt ? w.rainAt.getTime() : null;
     var code = w && w.rainCode;
     if (cfg.preview && /^\d+$/.test(Q.rainin || '')) { at = Date.now() + +Q.rainin * MIN; code = 61; }

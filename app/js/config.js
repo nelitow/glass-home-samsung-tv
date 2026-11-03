@@ -77,8 +77,10 @@
     // midnight on New Year's Eve (js/seasons.js).
     seasons: true,
 
-    // A "Vibe" tile on the dock: warm light drifting over a dark screen.
-    vibe: true,
+    // A tile for each HDMI input with a device plugged in (detected through
+    // the TV's VIDEOSOURCE list). Opening one switches the TV to that input,
+    // full screen; Back returns here. Set to false to drop the input tiles.
+    inputs: true,
 
     // A "Samsung Home" tile on the dock that opens the TV's own Smart Hub
     // home screen (the app id Samsung's Home button normally opens). Set to a

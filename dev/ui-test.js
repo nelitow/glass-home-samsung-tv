@@ -61,10 +61,10 @@ async function tvState(p) {
     const base = 'http://127.0.0.1:' + UI + '/index.html?preview=1&api=' + encodeURIComponent('http://127.0.0.1:' + PORT);
     await tv.goto(base + '&bg=nature-06.jpg', 4500);
     let s = await tvState(tv);
-    check('dock has 6 apps + 3 shortcuts + Vibe + Samsung + "+"', s.count === 12, s.count);
+    check('dock has 6 apps + 3 shortcuts + 2 HDMI + Samsung + "+"', s.count === 13, s.count);
     check('first tile (YouTube) focused at start', s.focus === 0 && s.label === 'YouTube', s);
     const order = await tv.eval(`[...document.querySelectorAll('#dock-row .tile')].map((t, i) => t.className.replace('tile tile-', '').split(' ')[0])`);
-    check('apps first, then shortcuts, then Vibe, Samsung and +', JSON.stringify(order) === JSON.stringify(['app', 'app', 'app', 'app', 'app', 'app', 'web', 'web', 'youtube', 'vibe', 'samsung', 'add']), order);
+    check('apps, shortcuts, HDMI inputs, Samsung and +', JSON.stringify(order) === JSON.stringify(['app', 'app', 'app', 'app', 'app', 'app', 'web', 'web', 'youtube', 'input', 'input', 'samsung', 'add']), order);
     await tv.shot(path.join(OUT, 'tv-home.png'));
 
     await tv.key(K.LEFT);
@@ -110,13 +110,13 @@ async function tvState(p) {
     // Hide an app, then bring it back from the + panel.
     await tv.key(K.ENTER, { hold: 900 });
     s = await tvState(tv);
-    check('app menu offers Hide', s.menuItems.indexOf('Hide') >= 0, s.menuItems);
-    await tv.key(K.DOWN);                  // Move left -> Hide
+    check('app menu is Hide + Cancel (apps auto-ordered)', s.menuItems.some((m) => /^Hide/.test(m)) && s.menuItems.length === 2, s.menuItems);
+    // Apps are auto-ordered now, so the app menu is just Hide (focused) + Cancel.
     const beforeHide = await tvState(tv);
     await tv.key(K.ENTER);
     await sleep(400);
     s = await tvState(tv);
-    check('Hide removes the app from the dock', s.count === 11, { count: s.count, before: beforeHide.menuItems, open: beforeHide.menuOpen, label: beforeHide.label });
+    check('Hide removes the app from the dock', s.count === 12, { count: s.count, before: beforeHide.menuItems, open: beforeHide.menuOpen, label: beforeHide.label });
 
     // Go to the + tile (last) and open the panel.
     for (let i = 0; i < 14; i++) await tv.key(K.RIGHT);
@@ -134,7 +134,7 @@ async function tvState(p) {
     await tv.key(K.ENTER);                 // Show hidden apps
     await sleep(400);
     s = await tvState(tv);
-    check('hidden app restored', s.count === 12, s.count);
+    check('hidden app restored', s.count === 13, s.count);
     await tv.key(K.LEFT);
     await sleep(300);
     await tv.shot(path.join(OUT, 'tv-panel.png'));
@@ -163,7 +163,7 @@ async function tvState(p) {
     check('Back closes the panel', !s.panelOpen, s);
     await tv.key(K.BACK);
     s = await tvState(tv);
-    check('Back at the top level does nothing', !s.panelOpen && !s.menuOpen && s.count === 12, s);
+    check('Back at the top level does nothing', !s.panelOpen && !s.menuOpen && s.count === 13, s);
 
     // Visibility: hidden pauses the clock timer and photo rotation.
     const vis = await tv.eval(`(() => {
@@ -276,9 +276,18 @@ async function tvState(p) {
     const tv3 = await browser.newPage({ width: 1920, height: 1080 });
     await tv3.goto(base + '&bg=nature-04.jpg&focus=0', 4500);
     const n3 = await tv3.eval(`document.querySelectorAll('#dock-row .tile').length`);
-    check('first run: six apps, Vibe, Samsung and +', n3 === 9, n3);
+    check('first run: six apps, 2 HDMI, Samsung and +', n3 === 10, n3);
     await tv3.shot(path.join(OUT, 'tv-first-run.png'));
     await tv3.close();
+
+    // Frecency: an app opened often sorts to the front of the dock.
+    const tv5 = await browser.newPage({ width: 1920, height: 1080 });
+    await tv5.goto(base + '&bg=nature-06.jpg', 3000);
+    await tv5.eval(`localStorage.setItem('gh.appUsage', JSON.stringify({ netflix: { count: 9, last: Date.now() } }))`);
+    await tv5.goto(base + '&bg=nature-06.jpg&focus=0', 4500);
+    const s5 = await tvState(tv5);
+    check('frecency: most-used app (Netflix) sorts to the front', s5.focus === 0 && s5.label === 'Netflix', s5);
+    await tv5.close();
   } finally {
     await browser.close();
     runner.kill('SIGTERM');
