@@ -106,6 +106,30 @@ ID=$(json "d['photo']['id']")
 expect "server read the JPEG size" "1920x1080" "$(json "str(d['photo']['w'])+'x'+str(d['photo']['h'])")"
 if printf '%s' "$ID" | grep -Eq '^[a-f0-9]{24}$'; then ok "server chose a random file name ($ID)"; else bad "random id" "$ID"; fi
 [ -f "$T/data/photos/$ID.jpg" ] && ok "photo stored as photos/$ID.jpg" || bad "photo file" "missing"
+expect "new upload defaults all flags on" "True True True" "$(json "str(d['photo']['on'])+' '+str(d['photo']['home'])+' '+str(d['photo']['saver'])")"
+expect "photo flags require session" 401 "$(api PATCH /api/photos/$ID '' '{"on":false}')"
+expect "photo flags require CSRF header" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -b "$J1" -H 'Content-Type: application/json' --data '{"on":false}' $B/api/photos/$ID)"
+expect "photo flags reject foreign Origin" 403 "$(curl -s -o /dev/null -w '%{http_code}' -X PATCH -b "$J1" -H 'X-GH: 1' -H 'Origin: http://evil.example' -H 'Content-Type: application/json' --data '{"on":false}' $B/api/photos/$ID)"
+expect "photo flags saved" 200 "$(api PATCH /api/photos/$ID "$J1" '{"on":false,"home":true,"saver":false}')"
+expect "TV projection keeps flags" "False True False" "$(local_state | python3 -c "import json,sys; p=json.load(sys.stdin)['photos'][0]; print(p['on'],p['home'],p['saver'])")"
+expect "phone projection keeps flags" "False True False" "$(api GET /api/photos "$J1" >/dev/null; json "str(d['photos'][0]['on'])+' '+str(d['photos'][0]['home'])+' '+str(d['photos'][0]['saver'])")"
+BUNDLED=$(json "d['bundled'][0]['file']")
+expect "bundled defaults all flags on" "True True True" "$(json "str(d['bundled'][0]['on'])+' '+str(d['bundled'][0]['home'])+' '+str(d['bundled'][0]['saver'])")"
+REV=$(local_state | python3 -c "import json,sys; print(json.load(sys.stdin)['rev'])")
+expect "bundled flags saved" 200 "$(api PATCH /api/bundled/$BUNDLED "$J1" '{"on":false,"home":false,"saver":false}')"
+expect "bundled edit bumps revision" "$((REV + 1))" "$(local_state | python3 -c "import json,sys; print(json.load(sys.stdin)['rev'])")"
+expect "TV bundled projection keeps flags" "False False False" "$(local_state | python3 -c "import json,sys; p=json.load(sys.stdin)['bundled']['$BUNDLED']; print(p['on'],p['home'],p['saver'])")"
+expect "bundled thumbnail authenticated" 401 "$(curl -s -o /dev/null -w '%{http_code}' $B/media/bundled/$BUNDLED)"
+expect "bundled thumbnail served" 200 "$(curl -s -o /dev/null -w '%{http_code}' -b "$J1" $B/media/bundled/$BUNDLED)"
+for badkey in __proto__ constructor prototype unknown.jpg; do
+  expect "bundled key $badkey rejected" 404 "$(api PATCH /api/bundled/$badkey "$J1" '{"on":false}')"
+  expect "bundled file $badkey not served" 404 "$(curl -s -o /dev/null -w '%{http_code}' -b "$J1" $B/media/bundled/$badkey)"
+done
+for flags in '{}' '{"on":0}' '{"home":"false"}' '{"saver":null}' '{"on":false,"extra":true}' '{"__proto__":{"on":false}}'; do
+  expect "invalid flags rejected: $flags" 400 "$(api PATCH /api/bundled/$BUNDLED "$J1" "$flags")"
+done
+expect "flags body bounded" 413 "$(api PATCH /api/bundled/$BUNDLED "$J1" "$(python3 -c "import json; print(json.dumps({'on':'x'*300}))")")"
+expect "photo flags can be restored" 200 "$(api PATCH /api/photos/$ID "$J1" '{"on":true}')"
 expect "thumbnail upload accepted" 204 "$(curl -s -o /dev/null -w '%{http_code}' -X PUT -b "$J1" -H 'X-GH: 1' -H 'Content-Type: image/jpeg' --data-binary @"$T/thumb.jpg" $B/api/photos/$ID/thumb)"
 expect "photo list" 200 "$(api GET /api/photos "$J1")"
 expect "list contains the photo with its thumbnail" "True" "$(json "any(p['id']=='$ID' and p['thumb'] for p in d['photos'])")"
@@ -204,6 +228,7 @@ start_runner
 expect "session survives a service restart" 200 "$(api GET /api/me "$J3")"
 expect "TV still shows the password after a restart" "$TVPW" "$(current_pw)"
 expect "shown.json is private (0600)" "600" "$(stat -f %Lp "$T/data/shown.json" 2>/dev/null || stat -c %a "$T/data/shown.json")"
+expect "bundled preferences survive restart" "False False False" "$(api GET /api/photos "$J3" >/dev/null; json "str(d['bundled'][0]['on'])+' '+str(d['bundled'][0]['home'])+' '+str(d['bundled'][0]['saver'])")"
 expect "one shortcut still there" 1 "$(api GET /api/shortcuts "$J3" >/dev/null; json "len(d['shortcuts'])")"
 
 echo "lockout (from ::1, a different address than 127.0.0.1)"

@@ -87,15 +87,19 @@
     this.remaining = 0;
     this.paused = false;
     this.busy = false;
+    this.fading = false;
     this.started = false;
     this.anims = [null, null];
+    this.shownKeys = [null, null];
+    this.loadId = 0;                 // invalidates a decode retired by a membership change
+    this.showId = 0;                 // owns delayed fade cleanup
     var seen = GH.ls.get('gh.bg.seen');
     this.seen = seen && seen.day === today() ? seen.keys : [];
   }
 
   // items: [{ key, url, credit, user, fresh }]. Fresh items (new uploads) are
   // queued to show next, newest last.
-  Backdrop.prototype.setPhotos = function (items) {
+  Backdrop.prototype.setPhotos = function (items, switchPool) {
     var self = this;
     this.items = items.slice();
     this.byKey = {};
@@ -108,7 +112,45 @@
     });
     this.fresh = this.fresh.filter(function (k) { return self.byKey[k]; });
     this.day = null;                  // reshuffle lazily
-    if (this.started && !this.current && !this.busy) this.advance();
+    var evicted = this.current && !this.byKey[this.current.key];
+    // A mode switch keeps the painted layer until its replacement is ready.
+    // Retire in-flight work even if the current photo belongs to both pools.
+    if (switchPool && this.items.length) {
+      this.loadId += 1;
+      this.busy = false;
+      this.pendingImg = null;
+      if (evicted || (this.started && !this.current)) this.advance();
+      else if (this.started && !this.paused && !this.timer) this._schedule(this.opts.interval || 45000);
+      return;
+    }
+    if (!this.items.length || evicted || this.shownKeys.some(function (k) { return k && !self.byKey[k]; })) {
+      this._clear();
+      if (evicted || this.started) this.advance();
+    } else if (this.started && !this.current && !this.busy) this.advance();
+  };
+
+  // Retire both layers immediately, including the outgoing side of a fade.
+  // The stage's dark gradient is the deliberate empty-pool background.
+  Backdrop.prototype._clear = function () {
+    var self = this;
+    this.loadId += 1;
+    this.showId += 1;
+    this.busy = false;
+    this.fading = false;
+    this.pendingImg = null;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.layers.forEach(function (layer, i) {
+      if (self.anims[i]) { try { self.anims[i].cancel(); } catch (e) { /* ignore */ } }
+      self.anims[i] = null;
+      layer.classList.remove('show');
+      layer.classList.remove('instant');
+      layer.textContent = '';
+    });
+    this.shownKeys = [null, null];
+    this.current = null;
+    this.front = -1;
+    if (this.opts.onShow) this.opts.onShow(null);
   };
 
   Backdrop.prototype._ensureOrder = function () {
@@ -185,20 +227,32 @@
 
   Backdrop.prototype.advance = function (forced, instant, attempt) {
     var self = this;
-    if (this.paused || this.busy) return;
+    if (this.paused || this.busy || this.pendingImg || !this.items.length) return;
     var it = forced || this._pick();
-    if (!it) { this._schedule(this.opts.interval || 45000); return; }
+    if (!it) {
+      // If the whole new pool failed, do not retain an old-pool photo forever.
+      if (this.current && !this.byKey[this.current.key]) this._clear();
+      this._schedule(this.opts.interval || 45000);
+      return;
+    }
     attempt = attempt || 0;
     this.busy = true;
+    var loadId = ++this.loadId;
     decodeImage(it.url).then(function (img) {
+      if (loadId !== self.loadId) return;
       self.busy = false;
+      if (!self.byKey[it.key]) { self.advance(); return; }
       if (self.paused) { self.pendingImg = { it: it, img: img }; return; }
       self._show(it, img, instant);
     }, function () {
+      if (loadId !== self.loadId) return;
       self.busy = false;
       self.bad[it.key] = Date.now();
       if (attempt < 6) self.advance(null, instant, attempt + 1);
-      else self._schedule(self.opts.interval || 45000);
+      else {
+        if (self.current && !self.byKey[self.current.key]) self._clear();
+        self._schedule(self.opts.interval || 45000);
+      }
     });
   };
 
@@ -236,27 +290,48 @@
   };
 
   Backdrop.prototype._show = function (it, img, instant) {
+    if (!this.byKey[it.key]) { this.advance(); return; }
+    // Both canvases are in use during a fade. Wait for the outgoing layer
+    // before painting another decoded image (rapid enter/wake is possible).
+    if (this.fading) { this.pendingImg = { it: it, img: img }; return; }
     var self = this;
+    var showId = ++this.showId;
+    this.fading = true;
     var back = this.front < 0 ? 0 : 1 - this.front;
     var layer = this.layers[back];
     var old = this.front >= 0 ? this.layers[this.front] : null;
+    // A queued replacement may reuse the outgoing layer in the same frame
+    // it was retired. Commit opacity 0 before putting the new canvas there.
+    layer.classList.add('instant');
+    layer.classList.remove('show');
+    void layer.offsetWidth;
+    this.shownKeys[back] = it.key;
     layer.textContent = '';
     img = toCanvas(img);
     layer.appendChild(img);
     this._kenBurns(back, img, it.key);
     layer.style.zIndex = '2';
     if (old) old.style.zIndex = '1';
-    if (instant) layer.classList.add('instant');
+    if (!instant) layer.classList.remove('instant');
     // Next frame, so the transition runs from opacity 0.
     requestAnimationFrame(function () {
+      if (showId !== self.showId) return;
       layer.classList.add('show');
       setTimeout(function () {
+        if (showId !== self.showId) return;
         layer.classList.remove('instant');
         if (old && old !== layer) {
           old.classList.remove('show');
           var oi = self.layers.indexOf(old);
+          self.shownKeys[oi] = null;
           if (self.anims[oi]) { try { self.anims[oi].cancel(); } catch (e) { /* ignore */ } self.anims[oi] = null; }
           old.textContent = '';
+        }
+        self.fading = false;
+        if (self.pendingImg && !self.paused) {
+          var p = self.pendingImg;
+          self.pendingImg = null;
+          self._show(p.it, p.img, false);
         }
       }, instant ? 50 : (self.opts.fade || 1600) + 120);
     });
@@ -291,7 +366,7 @@
       return;
     }
     if (!this.started) return;
-    if (!this.current) { this.advance(); return; }
+    if (!this.current || !this.byKey[this.current.key]) { this.advance(); return; }
     this._schedule(Math.max(1500, this.remaining || 0));
   };
 

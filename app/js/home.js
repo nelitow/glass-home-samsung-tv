@@ -812,9 +812,10 @@
     });
   }
 
-  // ---------- launch: the icon grows to fill the screen, and shrinks back on return ----------
+  // ---------- launch: the icon grows to fill the screen, then clears ----------
   var launchEl = $('launch');
   var launching = null;          // { anims, guard }
+  var launchSerial = 0;
 
   function tileFor(it) {
     if (it.el) return it.el;
@@ -823,11 +824,11 @@
   }
 
   function startLaunch(it) {
+    endLaunch();
     if (cfg.launchAnimation === false || Q.still === '1' || !document.body.animate) return false;
     var tile = tileFor(it);
     var face = tile && tile.querySelector('.face');
     if (!face) return false;
-    endLaunch(true);
     var sr = stage.getBoundingClientRect();
     var s = sr.width / 1920;
     var r = face.getBoundingClientRect();
@@ -851,36 +852,32 @@
     var scale = Math.max(1920 / w, 1080 / h);
     var dx = 960 - (x + w / 2), dy = 540 - (y + h / 2);
     var ease = 'cubic-bezier(0.4, 0, 0.2, 1)';
-    launching = {
-      anims: [
-        card.animate([{ transform: 'translate3d(0, 0, 0) scale(1)' },
-          { transform: 'translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(' + scale.toFixed(2) + ')' }],
-          { duration: 380, easing: ease, fill: 'forwards' }),
-        big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease-in', fill: 'forwards' })
-      ],
-      guard: null
-    };
+    var owner = { anims: [], guard: null };
+    launching = owner;
+    owner.guard = setTimeout(function () { if (launching === owner) endLaunch(); }, 2000);
+    try {
+      var anim = card.animate([{ transform: 'translate3d(0, 0, 0) scale(1)' },
+        { transform: 'translate3d(' + dx + 'px, ' + dy + 'px, 0) scale(' + scale.toFixed(2) + ')' }],
+        { duration: 380, easing: ease, fill: 'forwards' });
+      owner.anims.push(anim);
+      // Repaint home before the app covers us, so resume cannot show a stale tint.
+      anim.onfinish = function () { if (launching === owner) endLaunch(); };
+      owner.anims.push(big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease-in', fill: 'forwards' }));
+    } catch (e) { endLaunch(); }     // a failed animation must not strand the tinted card
     return true;
   }
 
-  // Plays the zoom backwards (back to the tile), or just clears it.
-  function endLaunch(now) {
-    if (!launching) return;
+  // Idempotent cleanup: no reverse animation can contend with the backdrop.
+  function endLaunch() {
+    launchSerial = (launchSerial + 1) >>> 0;
     var l = launching;
     launching = null;
-    clearTimeout(l.guard);
-    if (now || document.hidden) {
+    if (l) {
+      clearTimeout(l.guard);
       l.anims.forEach(function (a) { try { a.cancel(); } catch (e) { /* ignore */ } });
-      launchEl.classList.remove('on');
-      launchEl.textContent = '';
-      return;
     }
-    l.anims.forEach(function (a) { try { a.reverse(); } catch (e) { /* ignore */ } });
-    l.anims[0].onfinish = function () {
-      if (launching) return;
-      launchEl.classList.remove('on');
-      launchEl.textContent = '';
-    };
+    launchEl.classList.remove('on');
+    launchEl.textContent = '';
   }
 
   // ---------- opening things ----------
@@ -900,23 +897,23 @@
     // Count the launch for frecency; the dock re-sorts on return (while hidden).
     if (it.kind === 'app') recordAppUse(it.appKey);
     // The app starts loading at once; the zoom plays while it does.
-    var zoom = startLaunch(it);
+    startLaunch(it);
+    var owner = launchSerial;
     (function () {
       var p;
       if (it.kind === 'app') p = P.launchApp(it.id);
       else if (it.kind === 'web') p = P.openUrl(it.url);
       else p = P.openYouTube(it, ytMode);
       p.then(function (how) {
+        if (owner !== launchSerial) return;
         if (String(how).indexOf('preview:') === 0) {
           toast('Preview: would open ' + it.label);
-          if (zoom && launching) launching.guard = setTimeout(function () { endLaunch(); }, 1200);
           return;
         }
         if (how === 'youtube-home') toast('YouTube opened, but not at this video');
         else if (how === 'browser-home') toast('The browser opened without the address');
-        // the app normally hides this page; if it never does, come back
-        if (launching) launching.guard = setTimeout(function () { endLaunch(); }, 8000);
       }, function (e) {
+        if (owner !== launchSerial) return;
         endLaunch();
         toast('Couldn’t open ' + it.label + (e && e.message ? ' (' + e.message + ')' : ''), 4500);
       });
@@ -1027,7 +1024,7 @@
     $('panel-pw-note').textContent = pw.note || '';
     var users = (st && st.photos ? st.photos.length : 0);
     var scs = shortcuts.length;
-    var bits = [bundled.length + ' nature photos', users + (users === 1 ? ' of your photos' : ' of yours'), scs + (scs === 1 ? ' shortcut' : ' shortcuts')];
+    var bits = [users + (users === 1 ? ' of your photos' : ' of yours'), scs + (scs === 1 ? ' shortcut' : ' shortcuts')];
     var free = storageText();
     if (free) bits.push(free);
     $('panel-stats').textContent = bits.join('  ·  ');
@@ -1129,7 +1126,7 @@
   // ---------- keys ----------
   function onKeyDown(e) {
     var k = e.keyCode;
-    if (launching) endLaunch(true);           // a key during the zoom: back to normal at once
+    endLaunch();                           // any input retires even a partially started launch
     if (k === KEY.BACK || k === KEY.ESC || (k === KEY.BACKSPACE && cfg.preview)) {
       e.preventDefault();
       if (mode === 'menu') { S.back(); closeMenu(); }
@@ -1270,18 +1267,29 @@
 
   // Photos uploaded since the TV last looked are shown next ("fresh"); the
   // first sync after install only records what exists.
-  function updatePhotos() {
+  function updatePhotos(switchPool) {
+    var flag = document.documentElement.classList.contains('ambient') ? 'saver' : 'home';
+    function included(p) { return !p || (p.on !== false && p[flag] !== false); }
     var st = D.cached();
     var list = st && st.photos ? st.photos : [];
     var known = ls.get('gh.bg.known');
     var knownSet = {};
     (known || []).forEach(function (id) { knownSet[id] = true; });
-    var user = list.map(function (p) {
+    var user = list.filter(included).map(function (p) {
       return { key: 'u:' + p.id, url: D.media(p.url), credit: '', user: true, fresh: !!known && !knownSet[p.id] };
     });
     if (st && st.photos) ls.set('gh.bg.known', list.map(function (p) { return p.id; }));
-    backdrop.setPhotos(bundled.concat(user));
+    var prefs = (st && st.bundled) || {};
+    backdrop.setPhotos(bundled.filter(function (p) { return included(prefs[p.key.slice(2)]); }).concat(user), switchPool === true);
   }
+
+  function switchPhotoPool() {
+    if (!backdrop) return;
+    if (!document.documentElement.classList.contains('ambient')) backdrop.hold(2500);
+    updatePhotos(true);
+  }
+  window.addEventListener('gh:ambient-enter', switchPhotoPool);
+  window.addEventListener('gh:ambient-exit', switchPhotoPool);
 
   // Bundled photos are tagged with the parts of the day they suit (dawn, day,
   // golden, night); yours always fit.
@@ -1295,6 +1303,7 @@
     var c = $('credit');
     c.classList.remove('on');
     clearTimeout(creditTimer);
+    if (!it) { c.textContent = ''; return; }
     creditTimer = setTimeout(function () {
       c.textContent = '';
       if (it.credit) {
@@ -1319,8 +1328,11 @@
     return D.refresh().then(function (r) {
       serviceUp = r.online;
       if (r.changed) {
-        shortcuts = (r.state && r.state.shortcuts) || [];
-        rebuildDock();
+        var next = (r.state && r.state.shortcuts) || [];
+        if (JSON.stringify(next) !== JSON.stringify(shortcuts)) {
+          shortcuts = next;
+          rebuildDock();
+        }
         if (backdrop) updatePhotos();
       }
       if (mode === 'panel') renderPanel();
@@ -1366,6 +1378,7 @@
 
   // ---------- multitasking ----------
   function onVisibility() {
+    endLaunch();
     if (document.hidden) {
       saveFocus();
       document.documentElement.classList.add('paused');
@@ -1377,10 +1390,8 @@
       $('toast').classList.remove('on');
       if (backdrop) backdrop.pause();
       if (nowPlaying) nowPlaying.stop();
-      if (launching) clearTimeout(launching.guard);
       return;
     }
-    if (launching) setTimeout(function () { endLaunch(); }, 150);
     document.documentElement.classList.remove('paused');
     renderClock();
     clearInterval(clockTimer);
@@ -1476,6 +1487,8 @@
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('keyup', onKeyUp, true);
     document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', endLaunch);
+    document.addEventListener('pointerdown', endLaunch, true);
 
     nowPlaying = new GH.NowPlaying(onNowPlaying);
     loadMock().then(resolveApps).then(loadGrid).then(function () {

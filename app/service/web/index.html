@@ -105,7 +105,13 @@ form { display: grid; gap: 10px; }
 .bar i { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width 0.2s ease; }
 .meta { display: flex; justify-content: space-between; align-items: baseline; margin: 6px 4px 10px; font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; border-radius: 16px; overflow: hidden; }
-.grid button { position: relative; aspect-ratio: 16 / 9; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.grid .photo-preview { position: relative; aspect-ratio: 16 / 9; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.picture { min-width: 0; background: var(--fill-2); padding-bottom: 10px; }
+.photo-preview { display: block; width: 100%; }
+.picture-title { padding: 8px; font-size: 13px; }
+.picture-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-around; gap: 6px; }
+.picture-controls button { padding: 8px; border-radius: 8px; background: var(--fill-2); }
+.picture-controls label { font-size: 13px; }
 .grid img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0; transition: opacity 0.3s ease; }
 .grid img.ok { opacity: 1; }
 .empty { text-align: center; color: var(--text-2); font-size: 15px; padding: 26px 18px; }
@@ -175,7 +181,7 @@ form { display: grid; gap: 10px; }
       <span class="addr" id="top-addr"></span>
     </header>
     <nav class="seg" role="tablist">
-      <button type="button" data-tab="photos" role="tab">Photos</button>
+      <button type="button" data-tab="photos" role="tab">Pictures</button>
       <button type="button" data-tab="shortcuts" role="tab">Shortcuts</button>
       <button type="button" data-tab="settings" role="tab">Settings</button>
     </nav>
@@ -201,8 +207,10 @@ form { display: grid; gap: 10px; }
         </div>
       </div>
       <div class="meta"><span id="photo-count"></span><span id="photo-bytes"></span></div>
+      <h2>Pictures</h2>
+      <p class="hint">Show enables a picture; Home and Screensaver choose where it appears. An empty Home set leaves a blank background; an empty Screensaver set shows a blank background during the screensaver.</p>
       <div class="grid" id="grid"></div>
-      <p class="empty" id="photos-empty" hidden>No photos yet. Add some and they join the nature set on the TV.</p>
+      <p class="empty" id="photos-empty" hidden>No uploads yet. Add photos to join the preloaded pictures on the TV.</p>
     </div>
 
     <div id="tab-shortcuts" class="tab" hidden>
@@ -273,7 +281,7 @@ form { display: grid; gap: 10px; }
   'use strict';
   var YT = window.GHYouTube;
   var $ = function (id) { return document.getElementById(id); };
-  var state = { me: null, photos: [], limits: null, shortcuts: [], tab: 'photos', busy: false };
+  var state = { me: null, photos: [], bundled: [], limits: null, shortcuts: [], tab: 'photos', busy: false };
   var store = {
     get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
@@ -472,6 +480,7 @@ form { display: grid; gap: 10px; }
     return api('GET', '/api/photos').then(function (r) {
       if (r.status !== 200) return;
       state.photos = r.data.photos || [];
+      state.bundled = r.data.bundled || [];
       state.limits = r.data.limits;
       renderPhotos();
     });
@@ -485,26 +494,69 @@ form { display: grid; gap: 10px; }
   }
 
   function photoTile(p) {
-    var b = el('button');
-    b.type = 'button';
-    b.setAttribute('aria-label', 'Photo');
+    var tile = el('div', 'picture');
+    var b = el(p.file ? 'div' : 'button', 'photo-preview');
+    if (!p.file) {
+      b.type = 'button';
+      b.setAttribute('aria-label', 'View or delete uploaded photo');
+      b.addEventListener('click', function () { openViewer(p); });
+    }
     var img = new Image();
     img.alt = '';
     img.decoding = 'async';
     img.loading = 'lazy';
     img.onload = function () { img.classList.add('ok'); };
     img.onerror = function () { if (img.src.indexOf('/thumbs/') >= 0) img.src = '/media/photos/' + p.id + '.jpg'; };
-    img.src = p.thumb ? '/media/thumbs/' + p.id + '.jpg' : '/media/photos/' + p.id + '.jpg';
+    img.src = p.file ? p.thumb : p.thumb ? '/media/thumbs/' + p.id + '.jpg' : '/media/photos/' + p.id + '.jpg';
     b.appendChild(img);
-    b.addEventListener('click', function () { openViewer(p); });
-    return b;
+    tile.appendChild(b);
+    tile.appendChild(el('div', 'picture-title', p.file ? p.title + ' · Preloaded' : 'Uploaded photo'));
+    var controls = el('div', 'picture-controls');
+    var toggle = el('button');
+    toggle.type = 'button';
+    var label = el('label');
+    var home = el('input');
+    home.type = 'checkbox';
+    label.appendChild(home);
+    label.appendChild(document.createTextNode(' Home'));
+    controls.appendChild(toggle);
+    controls.appendChild(label);
+    var saverLabel = el('label');
+    var saver = el('input');
+    saver.type = 'checkbox';
+    saverLabel.appendChild(saver);
+    saverLabel.appendChild(document.createTextNode(' Screensaver'));
+    controls.appendChild(saverLabel);
+    tile.appendChild(controls);
+    function render() {
+      toggle.textContent = p.on === false ? 'Show' : 'Hide';
+      home.checked = p.home !== false;
+      saver.checked = p.saver !== false;
+    }
+    function change(field, value) {
+      toggle.disabled = home.disabled = saver.disabled = true;
+      var body = {};
+      body[field] = value;
+      api('PATCH', '/api/' + (p.file ? 'bundled/' + encodeURIComponent(p.file) : 'photos/' + p.id), body).then(function (r) {
+        toggle.disabled = home.disabled = saver.disabled = false;
+        if (r.status === 200) {
+          p.on = r.data.flags.on; p.home = r.data.flags.home; p.saver = r.data.flags.saver;
+        } else toast('Couldn’t save that picture setting.');
+        render();
+      });
+    }
+    toggle.addEventListener('click', function () { change('on', p.on === false); });
+    home.addEventListener('change', function () { change('home', home.checked); });
+    saver.addEventListener('change', function () { change('saver', saver.checked); });
+    render();
+    return tile;
   }
 
   function renderPhotos() {
     renderLimits();
     var grid = $('grid');
     grid.textContent = '';
-    state.photos.forEach(function (p) { grid.appendChild(photoTile(p)); });
+    state.photos.concat(state.bundled).forEach(function (p) { grid.appendChild(photoTile(p)); });
     $('photos-empty').hidden = state.photos.length > 0;
   }
 

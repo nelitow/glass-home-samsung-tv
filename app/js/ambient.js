@@ -39,13 +39,25 @@
   function enter() {
     if (document.hidden) return;
     if (isOpen('panel') || isOpen('menu') || isOpen('wx-panel')) { arm(); return; }
+    if (html.classList.contains('ambient')) return;
     html.classList.add('ambient');
+    window.dispatchEvent(new Event('gh:ambient-enter'));
   }
 
   function wake() {
-    html.classList.remove('ambient');
+    if (html.classList.contains('ambient')) {
+      html.classList.remove('ambient');
+      window.dispatchEvent(new Event('gh:ambient-exit'));
+    }
     arm();
   }
+
+  // Home can relaunch an already-visible app without a key or visibility event.
+  function wakeOnReturn() {
+    if (html.classList.contains('ambient')) wake();
+  }
+  window.addEventListener('appcontrol', wakeOnReturn);
+  window.addEventListener('focus', wakeOnReturn);
 
   // Window capture runs before the home screen's own (document) key handler.
   window.addEventListener('keydown', function (e) {
