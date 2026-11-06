@@ -13,7 +13,7 @@ const path = require('path');
 const { launch, sleep } = require('./cdp.js');
 
 const ROOT = path.join(__dirname, '..');
-const OUT = path.join(ROOT, 'preview');
+const OUT = process.env.GH_TEST_OUT || path.join(ROOT, 'preview');
 const PORT = 18290;
 const UI = 18291;
 const K = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, ENTER: 13, BACK: 27 };
@@ -230,7 +230,7 @@ async function tvState(p) {
 
     await ph.goto('http://127.0.0.1:' + UI + '/dev/login?to=/%23photos', 2500);
     check('signed-in phone sees the photos tab', await ph.eval(`!document.getElementById('main').hidden && !document.getElementById('tab-photos').hidden`));
-    const grid = await ph.eval(`document.querySelectorAll('#grid button').length`);
+    const grid = await ph.eval(`document.querySelectorAll('#grid button.photo-preview').length`);
     check('photo grid shows the 2 demo photos', grid === 2, grid);
 
     // Upload through the real page: a portrait JPEG and a PNG, resized in the browser.
@@ -242,7 +242,7 @@ async function tvState(p) {
     execFileSync('sips', ['-s', 'format', 'png', '-Z', '1600', path.join(ROOT, 'app', 'wallpapers', 'nature-03.jpg'), '--out', png], { stdio: 'ignore' });
     await ph.setFiles('#file-input', [portrait, png]);
     let up = 0;
-    for (let i = 0; i < 40 && up < 4; i++) { await sleep(500); up = await ph.eval(`document.querySelectorAll('#grid button').length`); }
+    for (let i = 0; i < 40 && up < 4; i++) { await sleep(500); up = await ph.eval(`document.querySelectorAll('#grid button.photo-preview').length`); }
     check('two uploads from the page (portrait JPEG + PNG) appear', up === 4, up);
     const st = await ph.eval(`fetch('/api/photos', { headers: { 'X-GH': '1' } }).then(r => r.json())`);
     const newest = st.photos.slice(0, 2);

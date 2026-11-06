@@ -373,7 +373,33 @@ function createService(opts) {
 
   // ---------- views ----------
   function photoView(p) {
-    return { id: p.id, added: p.added, bytes: p.bytes, w: p.w, h: p.h, thumb: !!p.thumb };
+    return { id: p.id, added: p.added, bytes: p.bytes, w: p.w, h: p.h, thumb: !!p.thumb,
+      on: p.on !== false, home: p.home !== false, saver: p.saver !== false };
+  }
+
+  function bundledView() {
+    return Object.keys(store.manifest).map(function (file) {
+      var flags = storeMod.photoFlags(store.state.bundled[file]);
+      return { file: file, title: store.manifest[file].title || file,
+        thumb: '/media/bundled/' + encodeURIComponent(file),
+        on: flags.on, home: flags.home, saver: flags.saver };
+    });
+  }
+
+  function updatePhotoFlags(ctx, bundled) {
+    return readJSONBody(ctx.req, 256).then(function (body) {
+      var keys = Object.keys(body);
+      if (!keys.length || keys.some(function (k) {
+        return ['on', 'home', 'saver'].indexOf(k) < 0 || typeof body[k] !== 'boolean';
+      })) return sendJSON(ctx.res, 400, { error: 'bad-flags' });
+      var id = ctx.segs[2];
+      var p = bundled ? storeMod.photoFlags(store.state.bundled[id]) : store.findPhoto(id);
+      if (!p) return sendJSON(ctx.res, 404, { error: 'not-found' });
+      keys.forEach(function (k) { p[k] = body[k]; });
+      if (bundled) store.state.bundled[id] = p;
+      store.bump();
+      sendJSON(ctx.res, 200, { flags: storeMod.photoFlags(p) });
+    }).catch(function (e) { bodyError(ctx.res, e); });
   }
 
   function shortcutView(x) {
@@ -571,12 +597,19 @@ function createService(opts) {
         var size = imgu.jpegSize(Buffer.concat(head, headLen));
         if (!size || got < 125) return fail(415, { error: 'not-jpeg' });
         if (size.width > 16000 || size.height > 16000) return fail(415, { error: 'too-big-dimensions' });
-        var refused = check ? check(got, size) : null;
+        var refused;
+        try { refused = check ? check(got, size) : null; } catch (e) {
+          note('upload check failed: ' + e.message);
+          return fail(500, { error: 'disk' });
+        }
         if (refused) return fail(refused.status, refused.body);
         fs.rename(tmp, destFile, function (err) {
           release();
           if (err) { storeMod.unlinkQuiet(tmp); note('rename failed: ' + err.message); return sendJSON(res, 500, { error: 'disk' }); }
-          done(got, size);
+          try { done(got, size); } catch (e) {
+            note('upload completion failed: ' + e.message);
+            sendJSON(res, 500, { error: 'disk' });
+          }
         });
       });
     });
@@ -708,15 +741,21 @@ function createService(opts) {
     if (s[1] === 'photos') {
       if (s.length === 2 && m === 'GET') {
         var list = store.state.photos.slice().reverse().map(photoView);
-        return sendJSON(res, 200, { photos: list, limits: limitsView() });
+        return sendJSON(res, 200, { photos: list, bundled: bundledView(), limits: limitsView() });
       }
       if (s.length === 2 && m === 'POST') return handlePhotoUpload(ctx);
       if (s.length >= 3 && !storeMod.PHOTO_ID.test(s[2])) return refuseBody(req, res, 400, { error: 'bad-id' });
+      if (s.length === 3 && m === 'PATCH') return updatePhotoFlags(ctx, false);
       if (s.length === 4 && s[3] === 'thumb' && m === 'PUT') return handleThumbUpload(ctx, s[2]);
       if (s.length === 3 && m === 'DELETE') {
         if (!store.removePhoto(s[2])) return sendJSON(res, 404, { error: 'not-found' });
         return sendJSON(res, 200, { ok: true, limits: limitsView() });
       }
+    }
+
+    if (s[1] === 'bundled' && s.length === 3 && m === 'PATCH') {
+      if (!store.manifest[s[2]]) return refuseBody(req, res, 404, { error: 'not-found' });
+      return updatePhotoFlags(ctx, true);
     }
 
     if (s[1] === 'shortcuts') {
@@ -810,6 +849,11 @@ function createService(opts) {
       if (!m || !store.findPhoto(m[1])) return sendJSON(ctx.res, 404, { error: 'not-found' });
       return serveFile(ctx.res, s[1] === 'photos' ? store.photoPath(m[1]) : store.thumbPath(m[1]), 'image/jpeg', year);
     }
+    if (s[1] === 'bundled' && store.manifest[name]) {
+      var ext = path.extname(name).toLowerCase();
+      return serveFile(ctx.res, path.join(appDir, 'wallpapers', store.manifest[name].file),
+        ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg', 86400);
+    }
     if (s[1] === 'icons') {
       if (!storeMod.ICON_FILE.test(name)) return sendJSON(ctx.res, 404, { error: 'not-found' });
       var ext = name.split('.').pop();
@@ -832,7 +876,9 @@ function createService(opts) {
       service: serviceInfo(),
       lan: lanInfo(),
       password: pw ? { id: pw.id, generated: !!pw.generated, plain: plain && plain.id === pw.id ? plain.value : null } : null,
-      photos: store.state.photos.map(function (p) { return { id: p.id, added: p.added, w: p.w, h: p.h, url: '/media/photos/' + p.id + '.jpg' }; }),
+      photos: store.state.photos.map(function (p) { return { id: p.id, added: p.added, w: p.w, h: p.h,
+        on: p.on !== false, home: p.home !== false, saver: p.saver !== false, url: '/media/photos/' + p.id + '.jpg' }; }),
+      bundled: store.bundledFlags(store.state.bundled),
       shortcuts: store.state.shortcuts.map(shortcutView),
       limits: limitsView()
     };
@@ -966,7 +1012,7 @@ function createService(opts) {
     try {
       dataInfo = chooseDataDir();
       if (!dataInfo) throw new Error('no writable data directory');
-      store = new storeMod.Store(dataInfo.dir, note);
+      store = new storeMod.Store(dataInfo.dir, note, appDir);
       store.load();
       var shown = store.readShown();
       if (shown && store.state.password && shown.id === store.state.password.id) plain = shown;

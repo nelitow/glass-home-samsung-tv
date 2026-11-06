@@ -21,7 +21,7 @@ function mkdirp(dir) {
 }
 
 function emptyState() {
-  return { v: 1, rev: 1, password: null, sessions: [], photos: [], shortcuts: [] };
+  return { v: 1, rev: 1, password: null, sessions: [], photos: [], shortcuts: [], bundled: Object.create(null) };
 }
 
 // Picks the first candidate directory that can really be written and read back.
@@ -45,7 +45,27 @@ function pickDataDir(candidates, log) {
   return null;
 }
 
-function Store(dir, log) {
+// Only explicit false excludes a picture, including old and orphan records.
+function photoFlags(p) {
+  p = p || {};
+  return { on: p.on !== false, home: p.home !== false, saver: p.saver !== false };
+}
+
+function readManifest(appDir) {
+  var out = Object.create(null);
+  try {
+    var list = JSON.parse(fs.readFileSync(path.join(appDir, 'wallpapers', 'manifest.json'), 'utf8'));
+    if (Array.isArray(list)) list.forEach(function (w) {
+      var f = w && w.file;
+      if (typeof f !== 'string' || f === '__proto__' || f === 'constructor' || f === 'prototype') return;
+      if (/^[A-Za-z0-9_-][A-Za-z0-9._-]*\.(jpe?g|png|webp)$/i.test(f)) out[f] = w;
+    });
+  } catch (e) { /* no packaged pictures */ }
+  return out;
+}
+
+function Store(dir, log, appDir) {
+  this.manifest = readManifest(appDir || path.join(__dirname, '..'));
   this.dir = dir;
   this.log = log || function () {};
   this.photosDir = path.join(dir, 'photos');
@@ -65,7 +85,17 @@ Store.prototype._read = function (file) {
   s.sessions = Array.isArray(data.sessions) ? data.sessions : [];
   s.photos = Array.isArray(data.photos) ? data.photos : [];
   s.shortcuts = Array.isArray(data.shortcuts) ? data.shortcuts : [];
+  s.bundled = this.bundledFlags(data.bundled);
   return s;
+};
+
+// Copy only current manifest keys and named flags; never retain foreign keys.
+Store.prototype.bundledFlags = function (source) {
+  var out = Object.create(null);
+  Object.keys(this.manifest).forEach(function (file) {
+    if (source && Object.prototype.hasOwnProperty.call(source, file)) out[file] = photoFlags(source[file]);
+  });
+  return out;
 };
 
 Store.prototype.load = function () {
@@ -78,7 +108,7 @@ Store.prototype.load = function () {
     }
   }
   this.state = loaded || emptyState();
-  this._reconcile();
+  if (this._reconcile()) this.state.rev += 1;
   this.save();
 };
 
@@ -86,6 +116,9 @@ Store.prototype.load = function () {
 Store.prototype._reconcile = function () {
   var self = this;
   var s = this.state;
+  var photoIds = new Set(s.photos.filter(Boolean).map(function (p) { return p.id; }));
+  var shortcutIds = new Set(s.shortcuts.filter(Boolean).map(function (x) { return x.id; }));
+  s.bundled = this.bundledFlags(s.bundled);
   var onDisk = {};
   safeList(this.photosDir).forEach(function (f) {
     if (/^\.up-/.test(f)) { unlinkQuiet(path.join(self.photosDir, f)); return; }
@@ -123,6 +156,10 @@ Store.prototype._reconcile = function () {
 
   var now = Date.now();
   s.sessions = s.sessions.filter(function (x) { return x && x.h && x.expires > now; });
+  return photoIds.size !== new Set(s.photos.map(function (p) { return p.id; })).size ||
+    shortcutIds.size !== new Set(s.shortcuts.map(function (x) { return x.id; })).size ||
+    s.photos.some(function (p) { return !photoIds.has(p.id); }) ||
+    s.shortcuts.some(function (x) { return !shortcutIds.has(x.id); });
 };
 
 Store.prototype.save = function () {
@@ -254,6 +291,7 @@ function unlinkQuiet(file) {
 
 module.exports = {
   Store: Store,
+  photoFlags: photoFlags,
   pickDataDir: pickDataDir,
   mkdirp: mkdirp,
   unlinkQuiet: unlinkQuiet,
